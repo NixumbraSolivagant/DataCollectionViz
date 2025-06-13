@@ -123,33 +123,6 @@ python main.py --setup
 3. **事件详情** - 事件信息显示
 4. **数据可视化** - 实时图表展示
 
-## 项目结构
-
-```
-python_web/
-├── main.py              # 主程序入口
-├── config.py            # 配置文件
-├── requirements.txt     # 依赖包列表
-├── README.md           # 项目文档
-├── database.py         # 数据管理模块
-├── crawler.py          # 网页爬虫模块
-├── data_processor.py   # 数据处理模块
-├── web_app.py          # Flask Web应用
-├── gui_app.py          # Tkinter GUI应用
-├── templates/          # HTML模板
-│   ├── base.html
-│   ├── index.html
-│   └── visualization.html
-├── static/             # 静态文件
-│   ├── css/
-│   └── js/
-├── data/               # 数据存储目录
-│   ├── events.json     # 事件数据文件
-│   ├── files/          # 下载的数据文件
-│   └── download_log.json # 下载日志
-├── cache/              # 缓存目录
-└── logs/               # 日志目录
-```
 
 ## 数据格式
 
@@ -199,45 +172,7 @@ GET /api/plot/{event_name}/{plot_type}
 - **Web框架**: Bootstrap
 - **爬虫**: Requests, BeautifulSoup
 
-## 开发说明
 
-### 添加新功能
-
-1. 在相应模块中添加功能代码
-2. 更新配置文件（如需要）
-3. 添加相应的API接口（Web应用）
-4. 更新GUI界面（桌面应用）
-5. 添加测试用例
-
-### 调试模式
-
-```bash
-# 启用详细日志
-export PYTHONPATH=.
-python main.py --web --debug
-```
-
-## 故障排除
-
-### 常见问题
-
-1. **依赖包安装失败**
-   ```bash
-   pip install --upgrade pip
-   pip install -r requirements.txt
-   ```
-
-2. **数据文件权限错误**
-   - 检查data目录权限
-   - 确保有写入权限
-
-3. **网络连接问题**
-   - 检查网络连接
-   - 配置代理设置（如需要）
-
-4. **内存不足**
-   - 减少同时处理的数据量
-   - 增加系统内存
 
 ### 日志查看
 
@@ -246,27 +181,6 @@ python main.py --web --debug
 tail -f logs/gwosc_system.log
 ```
 
-## 贡献指南
-
-1. Fork项目
-2. 创建功能分支
-3. 提交更改
-4. 推送到分支
-5. 创建Pull Request
-
-## 许可证
-
-本项目采用MIT许可证。详见LICENSE文件。
-
-## 联系方式
-
-如有问题或建议，请通过以下方式联系：
-
-- 提交Issue
-- 发送邮件
-- 参与讨论
-
-## 更新日志
 
 ### v1.0.0 (2024-01-01)
 - 初始版本发布
