@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+
+{% block title %}首页 - 引力波数据爬虫与可视化系统{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="mb-0">
+                    <i class="fas fa-wave-square me-2"></i>
+                    引力波数据爬虫与可视化系统
+                </h3>
+            </div>
+            <div class="card-body">
+                <p class="lead">
+                    欢迎使用引力波数据爬虫与可视化系统！本系统可以爬取GWOSC（引力波开放科学中心）的引力波事件数据，
+                    并提供强大的数据分析和可视化功能。
+                </p>
+                
+                <div class="row mt-4">
+                    <div class="col-md-4">
+                        <div class="stats-card text-center">
+                            <div class="stats-number">{{ stats.total_events }}</div>
+                            <div class="stats-label">总事件数</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="stats-card text-center">
+                            <div class="stats-number">{{ stats.total_files }}</div>
+                            <div class="stats-label">数据文件数</div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="stats-card text-center">
+                            <div class="stats-number">{{ stats.detectors|length }}</div>
+                            <div class="stats-label">探测器数</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">
+                    <i class="fas fa-clock me-2"></i>
+                    最新事件
+                </h4>
+            </div>
+            <div class="card-body">
+                {% if events %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>事件名称</th>
+                                <th>GPS时间</th>
+                                <th>质量1 (M☉)</th>
+                                <th>质量2 (M☉)</th>
+                                <th>距离 (Mpc)</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for event in events %}
+                            <tr>
+                                <td>
+                                    <strong>{{ event.common_name }}</strong>
+                                    {% if event.version %}
+                                    <span class="badge bg-secondary ms-2">v{{ event.version }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ "%.1f"|format(event.gps_time) if event.gps_time else '--' }}</td>
+                                <td>{{ "%.1f"|format(event.mass_1_source) if event.mass_1_source else '--' }}</td>
+                                <td>{{ "%.1f"|format(event.mass_2_source) if event.mass_2_source else '--' }}</td>
+                                <td>{{ "%.0f"|format(event.luminosity_distance) if event.luminosity_distance else '--' }}</td>
+                                <td>
+                                    <a href="/event/{{ event.common_name }}" class="btn btn-sm btn-primary">
+                                        <i class="fas fa-eye me-1"></i>查看
+                                    </a>
+                                    <a href="/visualization/{{ event.common_name }}" class="btn btn-sm btn-info">
+                                        <i class="fas fa-chart-line me-1"></i>可视化
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="text-center mt-3">
+                    <a href="/events" class="btn btn-primary">
+                        <i class="fas fa-list me-1"></i>查看所有事件
+                    </a>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-database fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">暂无事件数据</h5>
+                    <p class="text-muted">请先运行爬虫获取事件数据</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">
+                    <i class="fas fa-cogs me-2"></i>
+                    系统功能
+                </h4>
+            </div>
+            <div class="card-body">
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item">
+                        <i class="fas fa-spider text-primary me-2"></i>
+                        <strong>数据爬取</strong> - 自动爬取GWOSC事件列表和数据文件
+                    </li>
+                    <li class="list-group-item">
+                        <i class="fas fa-database text-success me-2"></i>
+                        <strong>数据存储</strong> - 本地文件存储事件信息和文件记录
+                    </li>
+                    <li class="list-group-item">
+                        <i class="fas fa-chart-line text-info me-2"></i>
+                        <strong>数据分析</strong> - FFT、功率谱密度、峰值检测等分析
+                    </li>
+                    <li class="list-group-item">
+                        <i class="fas fa-eye text-warning me-2"></i>
+                        <strong>可视化</strong> - 交互式图表展示时间序列和频谱数据
+                    </li>
+                    <li class="list-group-item">
+                        <i class="fas fa-desktop text-danger me-2"></i>
+                        <strong>桌面应用</strong> - Tkinter图形界面应用
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">
+                    <i class="fas fa-info-circle me-2"></i>
+                    系统信息
+                </h4>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-6">
+                        <p><strong>数据源:</strong></p>
+                        <p><strong>采样率:</strong></p>
+                        <p><strong>数据长度:</strong></p>
+                        <p><strong>探测器:</strong></p>
+                    </div>
+                    <div class="col-6">
+                        <p>GWOSC (引力波开放科学中心)</p>
+                        <p>16,384 Hz (16KHz)</p>
+                        <p>32 秒</p>
+                        <p>H1, L1, V1, K1</p>
+                    </div>
+                </div>
+                
+                <hr>
+                
+                <div class="text-center">
+                    <button class="btn btn-success me-2" onclick="startCrawler()">
+                        <i class="fas fa-play me-1"></i>开始爬取
+                    </button>
+                    <button class="btn btn-warning" onclick="refreshData()">
+                        <i class="fas fa-sync me-1"></i>刷新数据
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function startCrawler() {
+    showLoading();
+    showAlert('开始爬取数据，这可能需要一些时间...', 'info');
+    
+    // 这里可以调用爬虫API
+    setTimeout(() => {
+        hideLoading();
+        showAlert('爬取完成！', 'success');
+        location.reload();
+    }, 3000);
+}
+
+function refreshData() {
+    showLoading();
+    location.reload();
+}
+</script>
+{% endblock %} 

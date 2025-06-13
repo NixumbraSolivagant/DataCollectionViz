@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}错误 - 引力波数据爬虫与可视化系统{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-danger text-white">
+                <h3 class="mb-0">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    发生错误
+                </h3>
+            </div>
+            <div class="card-body text-center">
+                <i class="fas fa-exclamation-circle fa-4x text-danger mb-3"></i>
+                <h4 class="text-danger">抱歉，发生了错误</h4>
+                <p class="lead">{{ error }}</p>
+                
+                <div class="mt-4">
+                    <a href="/" class="btn btn-primary me-2">
+                        <i class="fas fa-home me-1"></i>返回首页
+                    </a>
+                    <a href="/events" class="btn btn-secondary me-2">
+                        <i class="fas fa-list me-1"></i>事件列表
+                    </a>
+                    <button class="btn btn-outline-secondary" onclick="history.back()">
+                        <i class="fas fa-arrow-left me-1"></i>返回上页
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

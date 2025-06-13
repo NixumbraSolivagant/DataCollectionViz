@@ -1,0 +1,333 @@
+{% extends "base.html" %}
+
+{% block title %}可视化 - {{ event.common_name }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="mb-0">
+                    <i class="fas fa-chart-line me-2"></i>
+                    事件可视化: {{ event.common_name }}
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <h6 class="card-title">GPS时间</h6>
+                                <p class="card-text">{{ "%.1f"|format(event.gps_time) if event.gps_time else '--' }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <h6 class="card-title">质量1</h6>
+                                <p class="card-text">{{ "%.1f"|format(event.mass_1_source) if event.mass_1_source else '--' }} M☉</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <h6 class="card-title">质量2</h6>
+                                <p class="card-text">{{ "%.1f"|format(event.mass_2_source) if event.mass_2_source else '--' }} M☉</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-light">
+                            <div class="card-body text-center">
+                                <h6 class="card-title">距离</h6>
+                                <p class="card-text">{{ "%.0f"|format(event.luminosity_distance) if event.luminosity_distance else '--' }} Mpc</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 探测器选择 -->
+                <div class="row mb-3">
+                    <div class="col-12">
+                        <label for="detectorSelect" class="form-label">选择探测器:</label>
+                        <select id="detectorSelect" class="form-select" style="max-width: 200px;">
+                            <option value="">加载中...</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- 图表类型选择 -->
+                <div class="row mb-3">
+                    <div class="col-12">
+                        <div class="btn-group" role="group">
+                            <input type="radio" class="btn-check" name="plotType" id="timeSeries" value="time_series" checked>
+                            <label class="btn btn-outline-primary" for="timeSeries">
+                                <i class="fas fa-clock me-1"></i>时间序列
+                            </label>
+                            
+                            <input type="radio" class="btn-check" name="plotType" id="fft" value="fft">
+                            <label class="btn btn-outline-primary" for="fft">
+                                <i class="fas fa-wave-square me-1"></i>FFT频谱
+                            </label>
+                            
+                            <input type="radio" class="btn-check" name="plotType" id="psd" value="psd">
+                            <label class="btn btn-outline-primary" for="psd">
+                                <i class="fas fa-chart-area me-1"></i>功率谱密度
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 图表容器 -->
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-body">
+                                <div id="plotContainer" style="height: 600px;">
+                                    <div class="text-center py-5">
+                                        <i class="fas fa-chart-line fa-3x text-muted mb-3"></i>
+                                        <h5 class="text-muted">选择图表类型开始可视化</h5>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 统计信息 -->
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    数据统计信息
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="statisticsContainer">
+                                    <div class="text-center py-3">
+                                        <i class="fas fa-spinner fa-spin fa-2x text-muted"></i>
+                                        <p class="mt-2 text-muted">加载统计信息...</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentPlot = null;
+let eventData = null;
+const eventName = '{{ event.common_name }}';
+
+// 页面加载完成后获取数据
+document.addEventListener('DOMContentLoaded', function() {
+    loadDetectors();
+    loadEventData();
+    
+    // 监听图表类型选择
+    document.querySelectorAll('input[name="plotType"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            if (eventData) {
+                updatePlot(this.value);
+            }
+        });
+    });
+    
+    // 监听探测器选择
+    document.getElementById('detectorSelect').addEventListener('change', function() {
+        if (this.value && eventData) {
+            updatePlot(document.querySelector('input[name="plotType"]:checked').value);
+        }
+    });
+});
+
+function loadDetectors() {
+    fetch(`/api/event/${eventName}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.available_detectors) {
+                const select = document.getElementById('detectorSelect');
+                select.innerHTML = '<option value="">选择探测器</option>';
+                data.available_detectors.forEach(detector => {
+                    select.innerHTML += `<option value="${detector.name}">${detector.name}</option>`;
+                });
+            }
+        })
+        .catch(error => {
+            console.error('加载探测器失败:', error);
+        });
+}
+
+function loadEventData() {
+    showLoading();
+    
+    fetch(`/api/event/${eventName}/data`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                eventData = data.data;
+                loadStatistics();
+            } else {
+                throw new Error(data.error);
+            }
+        })
+        .catch(error => {
+            handleError(error);
+            showNoDataMessage();
+        })
+        .finally(() => {
+            hideLoading();
+        });
+}
+
+function updatePlot(plotType) {
+    if (!eventData) return;
+    
+    const detector = document.getElementById('detectorSelect').value;
+    if (!detector) return;
+    
+    showLoading();
+    
+    fetch(`/api/plot/${eventName}/${plotType}?detectors=${detector}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.data) {
+                displayPlot(data.data);
+            } else {
+                throw new Error(data.error || '无法生成图表');
+            }
+        })
+        .catch(error => {
+            handleError(error);
+        })
+        .finally(() => {
+            hideLoading();
+        });
+}
+
+function displayPlot(plotData) {
+    const container = document.getElementById('plotContainer');
+    
+    // 清除现有图表
+    if (currentPlot) {
+        Plotly.purge(container);
+    }
+    
+    // 创建新图表
+    Plotly.newPlot(container, plotData.data, plotData.layout, {
+        responsive: true,
+        displayModeBar: true,
+        modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d'],
+        displaylogo: false
+    });
+    
+    currentPlot = container;
+}
+
+function loadStatistics() {
+    if (!eventData) return;
+    
+    const container = document.getElementById('statisticsContainer');
+    let html = '<div class="row">';
+    
+    for (const [detector, data] of Object.entries(eventData.detectors)) {
+        const stats = data.statistics;
+        html += `
+            <div class="col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0">${detector} 探测器</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-6">
+                                <small class="text-muted">均值</small><br>
+                                <strong>${formatNumber(stats.mean)}</strong>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted">标准差</small><br>
+                                <strong>${formatNumber(stats.std)}</strong>
+                            </div>
+                        </div>
+                        <div class="row mt-2">
+                            <div class="col-6">
+                                <small class="text-muted">最小值</small><br>
+                                <strong>${formatNumber(stats.min)}</strong>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted">最大值</small><br>
+                                <strong>${formatNumber(stats.max)}</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function showLoading() {
+    const container = document.getElementById('plotContainer');
+    container.innerHTML = `
+        <div class="text-center py-5">
+            <i class="fas fa-spinner fa-spin fa-3x text-primary mb-3"></i>
+            <h5 class="text-primary">加载中...</h5>
+        </div>
+    `;
+}
+
+function hideLoading() {
+    // 加载完成后，如果还没有选择图表类型，显示提示
+    if (!document.querySelector('input[name="plotType"]:checked')) {
+        const container = document.getElementById('plotContainer');
+        container.innerHTML = `
+            <div class="text-center py-5">
+                <i class="fas fa-chart-line fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">选择图表类型开始可视化</h5>
+            </div>
+        `;
+    }
+}
+
+function handleError(error) {
+    console.error('错误:', error);
+    const container = document.getElementById('plotContainer');
+    container.innerHTML = `
+        <div class="text-center py-5">
+            <i class="fas fa-exclamation-triangle fa-3x text-danger mb-3"></i>
+            <h5 class="text-danger">加载失败</h5>
+            <p class="text-muted">${error.message}</p>
+        </div>
+    `;
+}
+
+function showNoDataMessage() {
+    const container = document.getElementById('plotContainer');
+    container.innerHTML = `
+        <div class="text-center py-5">
+            <i class="fas fa-exclamation-triangle fa-3x text-warning mb-3"></i>
+            <h5 class="text-warning">暂无数据</h5>
+            <p class="text-muted">该事件暂无可用的数据文件</p>
+        </div>
+    `;
+}
+
+function formatNumber(num) {
+    if (num === null || num === undefined) return 'N/A';
+    return Number(num).toExponential(3);
+}
+</script>
+{% endblock %} 

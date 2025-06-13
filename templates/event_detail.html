@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+
+{% block title %}事件详情 - {{ event.common_name }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="mb-0">
+                    <i class="fas fa-info-circle me-2"></i>
+                    事件详情: {{ event.common_name }}
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h5>基本信息</h5>
+                        <table class="table table-borderless">
+                            <tr>
+                                <td><strong>事件名称:</strong></td>
+                                <td>{{ event.common_name }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>目录:</strong></td>
+                                <td>{{ event.catalog or '--' }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>版本:</strong></td>
+                                <td>{{ event.version or '--' }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>GPS时间:</strong></td>
+                                <td>{{ "%.1f"|format(event.gps_time) if event.gps_time else '--' }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>距离:</strong></td>
+                                <td>{{ "%.0f"|format(event.luminosity_distance) if event.luminosity_distance else '--' }} Mpc</td>
+                            </tr>
+                            <tr>
+                                <td><strong>红移:</strong></td>
+                                <td>{{ "%.3f"|format(event.redshift) if event.redshift else '--' }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <h5>物理参数</h5>
+                        <table class="table table-borderless">
+                            <tr>
+                                <td><strong>质量1:</strong></td>
+                                <td>{{ "%.1f"|format(event.mass_1_source) if event.mass_1_source else '--' }} M☉</td>
+                            </tr>
+                            <tr>
+                                <td><strong>质量2:</strong></td>
+                                <td>{{ "%.1f"|format(event.mass_2_source) if event.mass_2_source else '--' }} M☉</td>
+                            </tr>
+                            <tr>
+                                <td><strong>有效自旋:</strong></td>
+                                <td>{{ "%.2f"|format(event.chi_eff) if event.chi_eff else '--' }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>啁啾质量:</strong></td>
+                                <td>{{ "%.1f"|format(event.chirp_mass_source) if event.chirp_mass_source else '--' }} M☉</td>
+                            </tr>
+                            <tr>
+                                <td><strong>最终质量:</strong></td>
+                                <td>{{ "%.1f"|format(event.final_mass_source) if event.final_mass_source else '--' }} M☉</td>
+                            </tr>
+                            <tr>
+                                <td><strong>误报率:</strong></td>
+                                <td>{{ event.far or '--' }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+                
+                <hr>
+                
+                <div class="row">
+                    <div class="col-12">
+                        <h5>数据文件状态</h5>
+                        {% if download_status %}
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>探测器</th>
+                                        <th>文件路径</th>
+                                        <th>文件大小</th>
+                                        <th>状态</th>
+                                        <th>下载时间</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for status in download_status %}
+                                    <tr>
+                                        <td>{{ status.detector }}</td>
+                                        <td>{{ status.file_path or '--' }}</td>
+                                        <td>{{ status.file_size or '--' }}</td>
+                                        <td>
+                                            {% if status.download_status == 'completed' %}
+                                            <span class="badge bg-success">已完成</span>
+                                            {% elif status.download_status == 'downloading' %}
+                                            <span class="badge bg-warning">下载中</span>
+                                            {% elif status.download_status == 'failed' %}
+                                            <span class="badge bg-danger">失败</span>
+                                            {% else %}
+                                            <span class="badge bg-secondary">{{ status.download_status }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ status.download_time or '--' }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            暂无数据文件下载记录
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="row mt-4">
+                    <div class="col-12 text-center">
+                        <a href="/visualization/{{ event.common_name }}" class="btn btn-primary me-2">
+                            <i class="fas fa-chart-line me-1"></i>数据可视化
+                        </a>
+                        <button class="btn btn-success me-2" onclick="downloadData()">
+                            <i class="fas fa-download me-1"></i>下载数据
+                        </button>
+                        <button class="btn btn-info me-2" onclick="analyzeData()">
+                            <i class="fas fa-cogs me-1"></i>分析数据
+                        </button>
+                        <a href="/events" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left me-1"></i>返回列表
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function downloadData() {
+    showLoading();
+    showAlert('开始下载数据文件...', 'info');
+    
+    // 这里可以调用下载API
+    setTimeout(() => {
+        hideLoading();
+        showAlert('数据下载完成！', 'success');
+        location.reload();
+    }, 3000);
+}
+
+function analyzeData() {
+    showLoading();
+    showAlert('开始分析数据...', 'info');
+    
+    // 这里可以调用分析API
+    setTimeout(() => {
+        hideLoading();
+        showAlert('数据分析完成！', 'success');
+    }, 2000);
+}
+</script>
+{% endblock %} 

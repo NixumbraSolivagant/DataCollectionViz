@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}事件列表 - 引力波数据爬虫与可视化系统{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="mb-0">
+                    <i class="fas fa-list me-2"></i>
+                    引力波事件列表
+                </h3>
+            </div>
+            <div class="card-body">
+                {% if events %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>事件名称</th>
+                                <th>GPS时间</th>
+                                <th>质量1 (M☉)</th>
+                                <th>质量2 (M☉)</th>
+                                <th>距离 (Mpc)</th>
+                                <th>置信度</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for event in events %}
+                            <tr>
+                                <td>
+                                    <strong>{{ event.common_name }}</strong>
+                                </td>
+                                <td>{{ "%.1f"|format(event.gps_time) if event.gps_time else '--' }}</td>
+                                <td>{{ "%.1f"|format(event.mass_1_source) if event.mass_1_source else '--' }}</td>
+                                <td>{{ "%.1f"|format(event.mass_2_source) if event.mass_2_source else '--' }}</td>
+                                <td>{{ "%.0f"|format(event.luminosity_distance) if event.luminosity_distance else '--' }}</td>
+                                <td>{{ event.catalog or '--' }}</td>
+                                <td>
+                                    <div class="btn-group" role="group">
+                                        <a href="/event/{{ event.common_name }}" class="btn btn-sm btn-primary">
+                                            <i class="fas fa-eye me-1"></i>详情
+                                        </a>
+                                        <a href="/visualization/{{ event.common_name }}" class="btn btn-sm btn-info">
+                                            <i class="fas fa-chart-line me-1"></i>可视化
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="text-center mt-3">
+                    <p class="text-muted">共 {{ events|length }} 个事件</p>
+                </div>
+                {% else %}
+                <div class="text-center py-5">
+                    <i class="fas fa-database fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">暂无事件数据</h5>
+                    <p class="text-muted">请先运行爬虫获取事件数据</p>
+                    <a href="/" class="btn btn-primary">
+                        <i class="fas fa-home me-1"></i>返回首页
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 
