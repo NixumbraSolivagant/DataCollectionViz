@@ -400,18 +400,24 @@ def api_plot(event_name, plot_type):
         detectors = request.args.get('detectors')
         if detectors:
             detectors = detectors.split(',')
+        logger.info(f"API /api/plot/{event_name}/{plot_type} 请求参数: detectors={detectors}")
         
         # 分析事件数据
         analysis_results = data_processor.analyze_event_data(event_name, detectors)
         if not analysis_results:
+            logger.error(f"没有找到数据文件: event={event_name}, detectors={detectors}")
             return jsonify({'success': False, 'error': '没有找到数据文件'})
         
         # 创建可视化数据
         viz_data = data_processor.create_visualization_data(analysis_results)
         if not viz_data:
+            logger.error(f"无法创建可视化数据: event={event_name}, detectors={detectors}")
             return jsonify({'success': False, 'error': '无法创建可视化数据'})
         
+        logger.info(f"viz_data: {json.dumps(viz_data)[:500]}")
+        
         # 根据图表类型生成数据
+        plot_data = None
         if plot_type == 'time_series':
             plot_data = generate_time_series_plot(viz_data)
         elif plot_type == 'fft':
@@ -419,98 +425,241 @@ def api_plot(event_name, plot_type):
         elif plot_type == 'psd':
             plot_data = generate_psd_plot(viz_data)
         else:
+            logger.error(f"不支持的图表类型: {plot_type}")
             return jsonify({'success': False, 'error': '不支持的图表类型'})
         
-        return jsonify({'success': True, 'plot_data': plot_data})
+        if not plot_data:
+            logger.error(f"生成图表数据失败: event={event_name}, plot_type={plot_type}")
+            return jsonify({'success': False, 'error': '生成图表数据失败'})
+        
+        # 确保返回的是有效的JSON数据
+        try:
+            # 如果plot_data已经是字符串，尝试解析它
+            if isinstance(plot_data, str):
+                plot_data = json.loads(plot_data)
+            # 如果plot_data是字典，直接使用
+            elif isinstance(plot_data, dict):
+                pass
+            # 其他情况，尝试序列化
+            else:
+                plot_data = json.loads(json.dumps(plot_data))
+            
+            logger.info(f"plot_data: {json.dumps(plot_data)[:500]}")
+            return jsonify({'success': True, 'plot_data': plot_data})
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON解析失败: {e}")
+            return jsonify({'success': False, 'error': '图表数据格式错误'})
+            
     except Exception as e:
-        logger.error(f"API生成图表失败: {e}")
+        logger.error(f"API生成图表失败: {e}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)})
 
 def generate_time_series_plot(viz_data):
     """生成时间序列图表数据"""
     try:
         traces = []
-        
-        for detector, data in viz_data.items():
-            if 'time' in data and 'strain' in data:
-                trace = go.Scatter(
-                    x=data['time'],
-                    y=data['strain'],
-                    mode='lines',
-                    name=f'{detector} 应变数据',
-                    line=dict(width=1)
-                )
-                traces.append(trace)
-        
+        if 'detectors' in viz_data:
+            for detector, det_data in viz_data['detectors'].items():
+                ts = det_data.get('time_series', {})
+                logger.info(f"{detector} time_series: time({len(ts.get('time', []))}), processed_data({len(ts.get('processed_data', []))})")
+                if ts and 'time' in ts and 'processed_data' in ts and len(ts['time']) > 0 and len(ts['processed_data']) > 0:
+                    trace = go.Scatter(
+                        x=ts['time'],
+                        y=ts['processed_data'],
+                        mode='lines',
+                        name=f'{detector} 应变数据',
+                        line=dict(width=1)
+                    )
+                    traces.append(trace)
+        if not traces:
+            logger.error("No valid traces for time series plot.")
+            return None
+            
         layout = go.Layout(
             title='引力波应变数据时间序列',
-            xaxis=dict(title='时间 (秒)'),
-            yaxis=dict(title='应变'),
-            hovermode='closest'
+            xaxis=dict(
+                title='时间 (秒)',
+                gridcolor='lightgray',
+                showgrid=True
+            ),
+            yaxis=dict(
+                title='应变',
+                gridcolor='lightgray',
+                showgrid=True
+            ),
+            plot_bgcolor='white',
+            hovermode='closest',
+            showlegend=True,
+            legend=dict(
+                x=0.01,
+                y=0.99,
+                bgcolor='rgba(255, 255, 255, 0.8)'
+            )
         )
         
         fig = go.Figure(data=traces, layout=layout)
-        return json.loads(plotly.utils.PlotlyJSONEncoder().encode(fig))
+        plot_data = json.loads(plotly.utils.PlotlyJSONEncoder().encode(fig))
+        
+        # 添加图表配置
+        plot_data['config'] = {
+            'displayModeBar': True,
+            'modeBarButtonsToRemove': [
+                'select2d',
+                'lasso2d',
+                'toggleSpikelines'
+            ],
+            'displaylogo': False,
+            'scrollZoom': True
+        }
+        
+        logger.info(f"plot_data: {json.dumps(plot_data)[:500]}")
+        return plot_data
     except Exception as e:
-        logger.error(f"生成时间序列图表失败: {e}")
+        logger.error(f"生成时间序列图表失败: {e}", exc_info=True)
         return None
 
 def generate_fft_plot(viz_data):
     """生成FFT图表数据"""
     try:
         traces = []
+        if 'detectors' in viz_data:
+            for detector, det_data in viz_data['detectors'].items():
+                fft = det_data.get('fft', {})
+                if fft and 'frequencies' in fft and 'magnitude' in fft:
+                    logger.info(f"{detector} fft: frequencies({len(fft['frequencies'])}), magnitude({len(fft['magnitude'])})")
+                    # 只显示 10Hz 以上的频率
+                    mask = np.array(fft['frequencies']) >= 10
+                    frequencies = np.array(fft['frequencies'])[mask]
+                    magnitude = np.array(fft['magnitude'])[mask]
+                    
+                    trace = go.Scatter(
+                        x=frequencies,
+                        y=magnitude,
+                        mode='lines',
+                        name=f'{detector} FFT',
+                        line=dict(width=1)
+                    )
+                    traces.append(trace)
         
-        for detector, data in viz_data.items():
-            if 'freq' in data and 'fft' in data:
-                trace = go.Scatter(
-                    x=data['freq'],
-                    y=np.abs(data['fft']),
-                    mode='lines',
-                    name=f'{detector} FFT',
-                    line=dict(width=1)
-                )
-                traces.append(trace)
-        
+        if not traces:
+            logger.error("No valid traces for FFT plot.")
+            return None
+            
         layout = go.Layout(
             title='快速傅里叶变换 (FFT)',
-            xaxis=dict(title='频率 (Hz)'),
-            yaxis=dict(title='幅度'),
-            hovermode='closest'
+            xaxis=dict(
+                title='频率 (Hz)',
+                type='log',
+                range=[np.log10(10), np.log10(2000)],
+                gridcolor='lightgray',
+                showgrid=True
+            ),
+            yaxis=dict(
+                title='幅度',
+                type='log',
+                gridcolor='lightgray',
+                showgrid=True
+            ),
+            plot_bgcolor='white',
+            hovermode='closest',
+            showlegend=True,
+            legend=dict(
+                x=0.01,
+                y=0.99,
+                bgcolor='rgba(255, 255, 255, 0.8)'
+            )
         )
         
         fig = go.Figure(data=traces, layout=layout)
-        return json.loads(plotly.utils.PlotlyJSONEncoder().encode(fig))
+        plot_data = json.loads(plotly.utils.PlotlyJSONEncoder().encode(fig))
+        
+        # 添加图表配置
+        plot_data['config'] = {
+            'displayModeBar': True,
+            'modeBarButtonsToRemove': [
+                'select2d',
+                'lasso2d',
+                'toggleSpikelines'
+            ],
+            'displaylogo': False,
+            'scrollZoom': True
+        }
+        
+        return plot_data
     except Exception as e:
-        logger.error(f"生成FFT图表失败: {e}")
+        logger.error(f"生成FFT图表失败: {e}", exc_info=True)
         return None
 
 def generate_psd_plot(viz_data):
     """生成功率谱密度图表数据"""
     try:
         traces = []
+        if 'detectors' in viz_data:
+            for detector, det_data in viz_data['detectors'].items():
+                psd = det_data.get('psd', {})
+                if psd and 'frequencies' in psd and 'power' in psd:
+                    logger.info(f"{detector} psd: frequencies({len(psd['frequencies'])}), power({len(psd['power'])})")
+                    # 只显示 10Hz 以上的频率
+                    mask = np.array(psd['frequencies']) >= 10
+                    frequencies = np.array(psd['frequencies'])[mask]
+                    power = np.array(psd['power'])[mask]
+                    
+                    trace = go.Scatter(
+                        x=frequencies,
+                        y=power,
+                        mode='lines',
+                        name=f'{detector} PSD',
+                        line=dict(width=1)
+                    )
+                    traces.append(trace)
         
-        for detector, data in viz_data.items():
-            if 'freq' in data and 'psd' in data:
-                trace = go.Scatter(
-                    x=data['freq'],
-                    y=data['psd'],
-                    mode='lines',
-                    name=f'{detector} PSD',
-                    line=dict(width=1)
-                )
-                traces.append(trace)
-        
+        if not traces:
+            logger.error("No valid traces for PSD plot.")
+            return None
+            
         layout = go.Layout(
             title='功率谱密度 (PSD)',
-            xaxis=dict(title='频率 (Hz)'),
-            yaxis=dict(title='功率谱密度 (1/Hz)'),
-            hovermode='closest'
+            xaxis=dict(
+                title='频率 (Hz)',
+                type='log',
+                range=[np.log10(10), np.log10(2000)],
+                gridcolor='lightgray',
+                showgrid=True
+            ),
+            yaxis=dict(
+                title='功率谱密度 (1/Hz)',
+                type='log',
+                gridcolor='lightgray',
+                showgrid=True
+            ),
+            plot_bgcolor='white',
+            hovermode='closest',
+            showlegend=True,
+            legend=dict(
+                x=0.01,
+                y=0.99,
+                bgcolor='rgba(255, 255, 255, 0.8)'
+            )
         )
         
         fig = go.Figure(data=traces, layout=layout)
-        return json.loads(plotly.utils.PlotlyJSONEncoder().encode(fig))
+        plot_data = json.loads(plotly.utils.PlotlyJSONEncoder().encode(fig))
+        
+        # 添加图表配置
+        plot_data['config'] = {
+            'displayModeBar': True,
+            'modeBarButtonsToRemove': [
+                'select2d',
+                'lasso2d',
+                'toggleSpikelines'
+            ],
+            'displaylogo': False,
+            'scrollZoom': True
+        }
+        
+        return plot_data
     except Exception as e:
-        logger.error(f"生成PSD图表失败: {e}")
+        logger.error(f"生成PSD图表失败: {e}", exc_info=True)
         return None
 
 @app.route('/download/<event_name>/<filename>')
@@ -524,6 +673,73 @@ def download_file(event_name, filename):
         return send_file(filepath, as_attachment=True)
     except Exception as e:
         logger.error(f"文件下载失败: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/event/<event_name>/analyze')
+def api_analyze_event(event_name):
+    """API: 分析事件数据"""
+    try:
+        # 获取请求的探测器
+        detectors = request.args.get('detectors')
+        if detectors:
+            detectors = detectors.split(',')
+        logger.info(f"API /api/event/{event_name}/analyze 请求参数: detectors={detectors}")
+        
+        # 分析事件数据
+        analysis_results = data_processor.analyze_event_data(event_name, detectors)
+        if not analysis_results:
+            logger.error(f"没有找到数据文件: event={event_name}, detectors={detectors}")
+            return jsonify({'success': False, 'error': '没有找到数据文件'})
+        
+        # 创建可视化数据
+        viz_data = data_processor.create_visualization_data(analysis_results)
+        if not viz_data:
+            logger.error(f"无法创建可视化数据: event={event_name}, detectors={detectors}")
+            return jsonify({'success': False, 'error': '无法创建可视化数据'})
+        
+        # 生成所有类型的图表数据
+        time_series_plot = generate_time_series_plot(viz_data)
+        fft_plot = generate_fft_plot(viz_data)
+        psd_plot = generate_psd_plot(viz_data)
+        
+        if not all([time_series_plot, fft_plot, psd_plot]):
+            logger.error(f"生成图表数据失败: event={event_name}")
+            return jsonify({'success': False, 'error': '生成图表数据失败'})
+        
+        # 提取统计信息
+        statistics = {}
+        for detector, det_data in viz_data['detectors'].items():
+            if 'statistics' in det_data:
+                stats = det_data['statistics']
+                # 确保所有数值都是可序列化的
+                statistics[detector] = {
+                    'time_domain': {
+                        k: float(v) if isinstance(v, (np.floating, float)) else v
+                        for k, v in stats['time_domain'].items()
+                    },
+                    'frequency_domain': {
+                        k: [float(x) if isinstance(x, (np.floating, float)) else x for x in v]
+                        if isinstance(v, list) else float(v) if isinstance(v, (np.floating, float)) else v
+                        for k, v in stats['frequency_domain'].items()
+                    },
+                    'psd': {
+                        k: float(v) if isinstance(v, (np.floating, float)) else v
+                        for k, v in stats['psd'].items()
+                    }
+                }
+        
+        return jsonify({
+            'success': True,
+            'statistics': statistics,
+            'plots': {
+                'time_series': time_series_plot,
+                'fft': fft_plot,
+                'psd': psd_plot
+            }
+        })
+            
+    except Exception as e:
+        logger.error(f"API分析事件数据失败: {e}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)})
 
 @app.errorhandler(404)

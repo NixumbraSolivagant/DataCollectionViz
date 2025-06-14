@@ -2,6 +2,11 @@
 
 {% block title %}可视化 - {{ event.common_name }}{% endblock %}
 
+{% block head %}
+{{ super() }}
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+{% endblock %}
+
 {% block content %}
 <div class="row">
     <div class="col-12">
@@ -84,8 +89,8 @@
                 <div class="row">
                     <div class="col-12">
                         <div class="card">
-                            <div class="card-body">
-                                <div id="plotContainer" style="height: 600px;">
+                            <div class="card-body p-0">
+                                <div id="plotContainer" style="width: 100%; height: 600px; position: relative; background-color: white;">
                                     <div class="text-center py-5">
                                         <i class="fas fa-chart-line fa-3x text-muted mb-3"></i>
                                         <h5 class="text-muted">选择图表类型开始可视化</h5>
@@ -199,15 +204,20 @@ function updatePlot(plotType) {
     showLoading();
     
     fetch(`/api/plot/${eventName}/${plotType}?detectors=${detector}`)
-        .then(response => response.json())
+        .then(response => {
+            console.log('API响应状态:', response.status);
+            return response.json();
+        })
         .then(data => {
-            if (data.success && data.data) {
-                displayPlot(data.data);
+            console.log('获取到图表数据:', data);
+            if (data.success && data.plot_data) {
+                displayPlot(data.plot_data);
             } else {
                 throw new Error(data.error || '无法生成图表');
             }
         })
         .catch(error => {
+            console.error('获取图表数据失败:', error);
             handleError(error);
         })
         .finally(() => {
@@ -216,6 +226,13 @@ function updatePlot(plotType) {
 }
 
 function displayPlot(plotData) {
+    console.log('displayPlot:', plotData);
+    
+    if (!plotData || !plotData.data || !plotData.layout) {
+        handleError('图表数据格式错误');
+        return;
+    }
+    
     const container = document.getElementById('plotContainer');
     
     // 清除现有图表
@@ -223,60 +240,65 @@ function displayPlot(plotData) {
         Plotly.purge(container);
     }
     
-    // 创建新图表
-    Plotly.newPlot(container, plotData.data, plotData.layout, {
-        responsive: true,
-        displayModeBar: true,
-        modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d'],
-        displaylogo: false
-    });
-    
-    currentPlot = container;
+    try {
+        console.log('开始渲染图表...');
+        console.log('data:', plotData.data);
+        console.log('layout:', plotData.layout);
+        
+        // 设置布局选项
+        const layout = {
+            ...plotData.layout,
+            autosize: true,
+            margin: { l: 50, r: 50, t: 50, b: 50 },
+            height: 600,
+            width: container.clientWidth,
+            paper_bgcolor: 'white',
+            plot_bgcolor: 'white'
+        };
+        
+        // 创建新图表
+        Plotly.newPlot(container, plotData.data, layout, {
+            responsive: true,
+            displayModeBar: true,
+            modeBarButtonsToRemove: ['select2d', 'lasso2d', 'toggleSpikelines'],
+            displaylogo: false,
+            scrollZoom: true
+        });
+        
+        // 监听窗口大小变化
+        window.addEventListener('resize', function() {
+            Plotly.relayout(container, {
+                width: container.clientWidth
+            });
+        });
+        
+        currentPlot = container;
+        console.log('图表渲染完成');
+    } catch (error) {
+        console.error('Plotly渲染错误:', error);
+        handleError('图表渲染失败: ' + error.message);
+    }
 }
 
-function loadStatistics() {
-    if (!eventData) return;
-    
-    const container = document.getElementById('statisticsContainer');
-    let html = '<div class="row">';
-    
-    for (const [detector, data] of Object.entries(eventData.detectors)) {
-        const stats = data.statistics;
-        html += `
-            <div class="col-md-6 mb-3">
-                <div class="card">
-                    <div class="card-header">
-                        <h6 class="mb-0">${detector} 探测器</h6>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-6">
-                                <small class="text-muted">均值</small><br>
-                                <strong>${formatNumber(stats.mean)}</strong>
-                            </div>
-                            <div class="col-6">
-                                <small class="text-muted">标准差</small><br>
-                                <strong>${formatNumber(stats.std)}</strong>
-                            </div>
-                        </div>
-                        <div class="row mt-2">
-                            <div class="col-6">
-                                <small class="text-muted">最小值</small><br>
-                                <strong>${formatNumber(stats.min)}</strong>
-                            </div>
-                            <div class="col-6">
-                                <small class="text-muted">最大值</small><br>
-                                <strong>${formatNumber(stats.max)}</strong>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-    
-    html += '</div>';
-    container.innerHTML = html;
+function handleError(error) {
+    console.error('Error:', error);
+    const container = document.getElementById('plotContainer');
+    container.innerHTML = `
+        <div class="text-center py-5">
+            <i class="fas fa-exclamation-triangle fa-3x text-danger mb-3"></i>
+            <h5 class="text-danger">${error.message || '发生错误'}</h5>
+        </div>
+    `;
+}
+
+function showNoDataMessage() {
+    const container = document.getElementById('plotContainer');
+    container.innerHTML = `
+        <div class="text-center py-5">
+            <i class="fas fa-chart-line fa-3x text-muted mb-3"></i>
+            <h5 class="text-muted">暂无数据</h5>
+        </div>
+    `;
 }
 
 function showLoading() {
@@ -290,44 +312,151 @@ function showLoading() {
 }
 
 function hideLoading() {
-    // 加载完成后，如果还没有选择图表类型，显示提示
-    if (!document.querySelector('input[name="plotType"]:checked')) {
-        const container = document.getElementById('plotContainer');
-        container.innerHTML = `
-            <div class="text-center py-5">
-                <i class="fas fa-chart-line fa-3x text-muted mb-3"></i>
-                <h5 class="text-muted">选择图表类型开始可视化</h5>
-            </div>
+    // 加载状态由displayPlot或handleError处理
+}
+
+function loadStatistics() {
+    const detector = document.getElementById('detectorSelect').value;
+    if (!detector || !eventData || !eventData.detectors || !eventData.detectors[detector]) {
+        showNoStatisticsMessage();
+        return;
+    }
+    
+    const stats = eventData.detectors[detector].statistics;
+    if (!stats) {
+        showNoStatisticsMessage();
+        return;
+    }
+    
+    const container = document.getElementById('statisticsContainer');
+    let html = '<div class="row">';
+    
+    // 时域统计
+    html += `
+        <div class="col-md-4">
+            <h6 class="mb-3">时域统计</h6>
+            <table class="table table-sm">
+                <tr>
+                    <td>均值</td>
+                    <td>${formatNumber(stats.time_domain.mean)}</td>
+                </tr>
+                <tr>
+                    <td>标准差</td>
+                    <td>${formatNumber(stats.time_domain.std)}</td>
+                </tr>
+                <tr>
+                    <td>最小值</td>
+                    <td>${formatNumber(stats.time_domain.min)}</td>
+                </tr>
+                <tr>
+                    <td>最大值</td>
+                    <td>${formatNumber(stats.time_domain.max)}</td>
+                </tr>
+                <tr>
+                    <td>峰峰值</td>
+                    <td>${formatNumber(stats.time_domain.peak_to_peak)}</td>
+                </tr>
+                <tr>
+                    <td>均方根</td>
+                    <td>${formatNumber(stats.time_domain.rms)}</td>
+                </tr>
+                <tr>
+                    <td>偏度</td>
+                    <td>${formatNumber(stats.time_domain.skewness)}</td>
+                </tr>
+                <tr>
+                    <td>峰度</td>
+                    <td>${formatNumber(stats.time_domain.kurtosis)}</td>
+                </tr>
+            </table>
+        </div>
+    `;
+    
+    // 频域统计
+    html += `
+        <div class="col-md-4">
+            <h6 class="mb-3">频域统计</h6>
+            <table class="table table-sm">
+                <tr>
+                    <td>带宽</td>
+                    <td>${formatNumber(stats.frequency_domain.bandwidth)} Hz</td>
+                </tr>
+                <tr>
+                    <td>总功率</td>
+                    <td>${formatNumber(stats.frequency_domain.total_power)}</td>
+                </tr>
+            </table>
+            <h6 class="mt-3">主要频率成分</h6>
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>频率 (Hz)</th>
+                        <th>幅度</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+    
+    for (let i = 0; i < stats.frequency_domain.main_frequencies.length; i++) {
+        html += `
+            <tr>
+                <td>${formatNumber(stats.frequency_domain.main_frequencies[i])}</td>
+                <td>${formatNumber(stats.frequency_domain.main_magnitudes[i])}</td>
+            </tr>
         `;
     }
-}
-
-function handleError(error) {
-    console.error('错误:', error);
-    const container = document.getElementById('plotContainer');
-    container.innerHTML = `
-        <div class="text-center py-5">
-            <i class="fas fa-exclamation-triangle fa-3x text-danger mb-3"></i>
-            <h5 class="text-danger">加载失败</h5>
-            <p class="text-muted">${error.message}</p>
+    
+    html += `
+                </tbody>
+            </table>
         </div>
     `;
-}
-
-function showNoDataMessage() {
-    const container = document.getElementById('plotContainer');
-    container.innerHTML = `
-        <div class="text-center py-5">
-            <i class="fas fa-exclamation-triangle fa-3x text-warning mb-3"></i>
-            <h5 class="text-warning">暂无数据</h5>
-            <p class="text-muted">该事件暂无可用的数据文件</p>
+    
+    // PSD统计
+    html += `
+        <div class="col-md-4">
+            <h6 class="mb-3">功率谱统计</h6>
+            <table class="table table-sm">
+                <tr>
+                    <td>平均功率</td>
+                    <td>${formatNumber(stats.psd.mean_power)}</td>
+                </tr>
+                <tr>
+                    <td>最大功率</td>
+                    <td>${formatNumber(stats.psd.max_power)}</td>
+                </tr>
+                <tr>
+                    <td>功率带宽</td>
+                    <td>${formatNumber(stats.psd.power_bandwidth)} Hz</td>
+                </tr>
+                <tr>
+                    <td>信噪比</td>
+                    <td>${formatNumber(stats.psd.snr)}</td>
+                </tr>
+            </table>
         </div>
     `;
+    
+    html += '</div>';
+    container.innerHTML = html;
 }
 
 function formatNumber(num) {
-    if (num === null || num === undefined) return 'N/A';
-    return Number(num).toExponential(3);
+    if (num === undefined || num === null) return '--';
+    if (Math.abs(num) < 0.001) {
+        return num.toExponential(3);
+    }
+    return num.toFixed(3);
+}
+
+function showNoStatisticsMessage() {
+    const container = document.getElementById('statisticsContainer');
+    container.innerHTML = `
+        <div class="text-center py-3">
+            <i class="fas fa-exclamation-circle fa-2x text-muted"></i>
+            <p class="mt-2 text-muted">暂无统计信息</p>
+        </div>
+    `;
 }
 </script>
 {% endblock %} 

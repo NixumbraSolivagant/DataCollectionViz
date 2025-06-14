@@ -2,6 +2,11 @@
 
 {% block title %}事件详情 - {{ event.common_name }}{% endblock %}
 
+{% block head %}
+{{ super() }}
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+{% endblock %}
+
 {% block content %}
 <div class="row">
     <div class="col-12">
@@ -125,6 +130,12 @@
                 </div>
                 
                 <div class="row mt-4">
+                    <div class="col-12">
+                        <div id="plot" style="width:100%; height:400px;"></div>
+                    </div>
+                </div>
+                
+                <div class="row mt-4">
                     <div class="col-12 text-center">
                         <a href="/visualization/{{ event.common_name }}" class="btn btn-primary me-2">
                             <i class="fas fa-chart-line me-1"></i>数据可视化
@@ -148,6 +159,23 @@
 
 {% block extra_js %}
 <script>
+function showError(message) {
+    console.error('Error:', message);
+    alert(message);
+}
+
+function showLoading() {
+    // 实现加载提示
+}
+
+function hideLoading() {
+    // 实现隐藏加载提示
+}
+
+function showAlert(message, type) {
+    // 实现提示消息
+}
+
 function downloadData() {
     showLoading();
     showAlert('开始下载数据文件...', 'info');
@@ -164,11 +192,287 @@ function analyzeData() {
     showLoading();
     showAlert('开始分析数据...', 'info');
     
-    // 这里可以调用分析API
-    setTimeout(() => {
+    // 获取选中的探测器
+    const detectors = Array.from(document.querySelectorAll('input[name="detector"]:checked'))
+        .map(input => input.value);
+    
+    if (detectors.length === 0) {
         hideLoading();
-        showAlert('数据分析完成！', 'success');
-    }, 2000);
+        showAlert('请至少选择一个探测器', 'warning');
+        return;
+    }
+    
+    // 调用分析API
+    fetch(`/api/event/${eventName}/analyze?detectors=${detectors.join(',')}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert('数据分析完成！', 'success');
+                // 更新统计信息
+                if (data.statistics) {
+                    updateStatistics(data.statistics);
+                }
+                // 更新图表
+                if (data.plots) {
+                    displayPlots(data.plots);
+                }
+            } else {
+                throw new Error(data.error || '分析失败');
+            }
+        })
+        .catch(error => {
+            console.error('分析数据失败:', error);
+            showAlert('分析数据失败: ' + error.message, 'danger');
+        })
+        .finally(() => {
+            hideLoading();
+        });
 }
+
+function updateStatistics(statistics) {
+    const container = document.getElementById('statisticsContainer');
+    if (!container) return;
+    
+    let html = '<div class="row">';
+    
+    for (const [detector, stats] of Object.entries(statistics)) {
+        html += `
+            <div class="col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0">${detector} 探测器</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <h6>时域统计</h6>
+                                <table class="table table-sm">
+                                    <tr>
+                                        <td>均值</td>
+                                        <td>${formatNumber(stats.time_domain.mean)}</td>
+                                    </tr>
+                                    <tr>
+                                        <td>标准差</td>
+                                        <td>${formatNumber(stats.time_domain.std)}</td>
+                                    </tr>
+                                    <tr>
+                                        <td>峰峰值</td>
+                                        <td>${formatNumber(stats.time_domain.peak_to_peak)}</td>
+                                    </tr>
+                                    <tr>
+                                        <td>均方根</td>
+                                        <td>${formatNumber(stats.time_domain.rms)}</td>
+                                    </tr>
+                                    <tr>
+                                        <td>偏度</td>
+                                        <td>${formatNumber(stats.time_domain.skewness)}</td>
+                                    </tr>
+                                    <tr>
+                                        <td>峰度</td>
+                                        <td>${formatNumber(stats.time_domain.kurtosis)}</td>
+                                    </tr>
+                                </table>
+                            </div>
+                            <div class="col-md-4">
+                                <h6>频域统计</h6>
+                                <table class="table table-sm">
+                                    <tr>
+                                        <td>带宽</td>
+                                        <td>${formatNumber(stats.frequency_domain.bandwidth)} Hz</td>
+                                    </tr>
+                                    <tr>
+                                        <td>总功率</td>
+                                        <td>${formatNumber(stats.frequency_domain.total_power)}</td>
+                                    </tr>
+                                </table>
+                                <h6 class="mt-3">主要频率</h6>
+                                <table class="table table-sm">
+                                    <thead>
+                                        <tr>
+                                            <th>频率 (Hz)</th>
+                                            <th>幅度</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${stats.frequency_domain.main_frequencies.map((freq, i) => `
+                                            <tr>
+                                                <td>${formatNumber(freq)}</td>
+                                                <td>${formatNumber(stats.frequency_domain.main_magnitudes[i])}</td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="col-md-4">
+                                <h6>功率谱统计</h6>
+                                <table class="table table-sm">
+                                    <tr>
+                                        <td>平均功率</td>
+                                        <td>${formatNumber(stats.psd.mean_power)}</td>
+                                    </tr>
+                                    <tr>
+                                        <td>最大功率</td>
+                                        <td>${formatNumber(stats.psd.max_power)}</td>
+                                    </tr>
+                                    <tr>
+                                        <td>功率带宽</td>
+                                        <td>${formatNumber(stats.psd.power_bandwidth)} Hz</td>
+                                    </tr>
+                                    <tr>
+                                        <td>信噪比</td>
+                                        <td>${formatNumber(stats.psd.snr)}</td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function formatNumber(num) {
+    if (num === undefined || num === null) return '--';
+    if (Math.abs(num) < 0.001) {
+        return num.toExponential(3);
+    }
+    return num.toFixed(3);
+}
+
+function updatePlot(eventName, plotType, detectors) {
+    console.log('updatePlot:', {eventName, plotType, detectors});
+    
+    if (!eventName || !plotType) {
+        showError('缺少必要参数');
+        return;
+    }
+    
+    showLoading();
+    
+    fetch(`/api/plot/${eventName}/${plotType}?detectors=${detectors}`)
+        .then(response => {
+            console.log('API响应状态:', response.status);
+            return response.json();
+        })
+        .then(data => {
+            console.log('获取到图表数据:', data);
+            displayPlot(data);
+        })
+        .catch(error => {
+            console.error('获取图表数据失败:', error);
+            showError('获取图表数据失败: ' + error.message);
+        })
+        .finally(() => {
+            hideLoading();
+        });
+}
+
+function displayPlot(data) {
+    console.log('displayPlot data:', data);
+    if (!data.success) {
+        showError(data.error || '无法生成图表');
+        return;
+    }
+    
+    const plotData = data.plot_data;
+    console.log('plotData:', plotData);
+    
+    if (!plotData) {
+        showError('图表数据为空');
+        return;
+    }
+    
+    if (!plotData.data) {
+        showError('图表数据缺少data字段');
+        return;
+    }
+    
+    if (!plotData.layout) {
+        showError('图表数据缺少layout字段');
+        return;
+    }
+    
+    if (!Array.isArray(plotData.data)) {
+        showError('图表data字段不是数组');
+        return;
+    }
+    
+    if (plotData.data.length === 0) {
+        showError('图表数据为空数组');
+        return;
+    }
+    
+    try {
+        console.log('开始渲染图表...');
+        console.log('data:', plotData.data);
+        console.log('layout:', plotData.layout);
+        
+        // 确保图表容器存在
+        const plotContainer = document.getElementById('plot');
+        if (!plotContainer) {
+            showError('找不到图表容器');
+            return;
+        }
+        
+        Plotly.newPlot('plot', plotData.data, plotData.layout);
+        console.log('图表渲染完成');
+    } catch (error) {
+        console.error('Plotly渲染错误:', error);
+        showError('图表渲染失败: ' + error.message);
+    }
+}
+
+function displayPlots(plots) {
+    // 创建图表容器
+    const container = document.getElementById('plot');
+    if (!container) return;
+    
+    // 创建标签页
+    let html = `
+        <ul class="nav nav-tabs mb-3" id="plotTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="time-series-tab" data-bs-toggle="tab" data-bs-target="#time-series" type="button" role="tab">时间序列</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="fft-tab" data-bs-toggle="tab" data-bs-target="#fft" type="button" role="tab">FFT频谱</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="psd-tab" data-bs-toggle="tab" data-bs-target="#psd" type="button" role="tab">功率谱密度</button>
+            </li>
+        </ul>
+        <div class="tab-content" id="plotTabsContent">
+            <div class="tab-pane fade show active" id="time-series" role="tabpanel"></div>
+            <div class="tab-pane fade" id="fft" role="tabpanel"></div>
+            <div class="tab-pane fade" id="psd" role="tabpanel"></div>
+        </div>
+    `;
+    container.innerHTML = html;
+    
+    // 渲染各个图表
+    Plotly.newPlot('time-series', plots.time_series.data, plots.time_series.layout, plots.time_series.config);
+    Plotly.newPlot('fft', plots.fft.data, plots.fft.layout, plots.fft.config);
+    Plotly.newPlot('psd', plots.psd.data, plots.psd.layout, plots.psd.config);
+    
+    // 监听标签页切换
+    document.querySelectorAll('#plotTabs button').forEach(button => {
+        button.addEventListener('shown.bs.tab', function (e) {
+            const targetId = e.target.getAttribute('data-bs-target').substring(1);
+            Plotly.Plots.resize(document.getElementById(targetId));
+        });
+    });
+}
+
+// 页面加载完成后自动加载图表
+document.addEventListener('DOMContentLoaded', function() {
+    const eventName = '{{ event.common_name }}';
+    const detectors = '{{ available_detectors|map(attribute="name")|join(",") }}';
+    
+    console.log('加载图表数据:', eventName, detectors);
+    updatePlot(eventName, 'time_series', detectors);
+});
 </script>
 {% endblock %} 

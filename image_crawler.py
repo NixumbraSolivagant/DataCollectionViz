@@ -178,6 +178,7 @@ class ImageCrawler:
                 self.logger.info(f"处理完成: {output_filename}")
         
         self.logger.info(f"图片处理完成，共处理 {processed_count} 张图片")
+        return processed_count
     
     def save_metadata(self):
         """保存元数据"""
@@ -238,11 +239,11 @@ class ImageCrawler:
             
             self.logger.info(f"图片处理完成，共处理 {processed_count} 张图片")
         
-        # 保存元数据
-        self.save_metadata()
+            # 保存元数据
+            self.save_metadata()
         
-        self.logger.info(f"爬取完成！共下载 {self.downloaded_count} 张图片")
-        self.logger.info(f"成功: {len(self.successful_urls)}, 失败: {len(self.failed_urls)}")
+            self.logger.info(f"爬取完成！共下载 {self.downloaded_count} 张图片")
+            self.logger.info(f"成功: {len(self.successful_urls)}, 失败: {len(self.failed_urls)}")
         
         except Exception as e:
             self.logger.error(f"爬取过程出错: {str(e)}")
