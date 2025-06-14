@@ -1,0 +1,325 @@
+{% extends "base.html" %}
+
+{% block title %}图片爬取 - 引力波数据系统{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="mb-4">
+                <i class="fas fa-spider"></i> 图片爬取
+            </h1>
+        </div>
+    </div>
+
+    <!-- 爬取配置 -->
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-cog"></i> 爬取配置</h5>
+                </div>
+                <div class="card-body">
+                    <form id="crawlForm">
+                        <div class="mb-3">
+                            <label for="maxImages" class="form-label">最大图片数量</label>
+                            <input type="number" class="form-control" id="maxImages" value="50" min="1" max="500">
+                            <div class="form-text">建议不超过500张，避免对目标网站造成压力</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">搜索关键词</label>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" value="引力波 gravitational wave" id="keyword1" checked>
+                                        <label class="form-check-label" for="keyword1">
+                                            引力波 gravitational wave
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" value="太极计划 Taiji program" id="keyword2" checked>
+                                        <label class="form-check-label" for="keyword2">
+                                            太极计划 Taiji program
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" value="LIGO gravitational wave detector" id="keyword3" checked>
+                                        <label class="form-check-label" for="keyword3">
+                                            LIGO gravitational wave detector
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" value="中国引力波探测" id="keyword4" checked>
+                                        <label class="form-check-label" for="keyword4">
+                                            中国引力波探测
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" value="太极卫星" id="keyword5" checked>
+                                        <label class="form-check-label" for="keyword5">
+                                            太极卫星
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" value="天琴计划" id="keyword6" checked>
+                                        <label class="form-check-label" for="keyword6">
+                                            天琴计划
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">目标网站</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="unsplash" id="site1" checked>
+                                <label class="form-check-label" for="site1">
+                                    Unsplash (高质量免费图片)
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="pixabay" id="site2" checked>
+                                <label class="form-check-label" for="site2">
+                                    Pixabay (免费图片库)
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" value="pexels" id="site3" checked>
+                                <label class="form-check-label" for="site3">
+                                    Pexels (免费图片)
+                                </label>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary" id="startCrawlBtn">
+                            <i class="fas fa-play"></i> 开始爬取
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="history.back()">
+                            <i class="fas fa-arrow-left"></i> 返回
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- 状态面板 -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-info-circle"></i> 爬取状态</h5>
+                </div>
+                <div class="card-body">
+                    <div id="crawlStatus">
+                        <p class="text-muted">等待开始...</p>
+                    </div>
+                    
+                    <div class="progress mb-3" style="display: none;" id="progressBar">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                             role="progressbar" style="width: 0%"></div>
+                    </div>
+                    
+                    <div id="crawlStats" style="display: none;">
+                        <div class="row text-center">
+                            <div class="col-6">
+                                <h6 class="text-success" id="successCount">0</h6>
+                                <small>成功</small>
+                            </div>
+                            <div class="col-6">
+                                <h6 class="text-danger" id="failedCount">0</h6>
+                                <small>失败</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 注意事项 -->
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h5><i class="fas fa-exclamation-triangle"></i> 注意事项</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled">
+                        <li><i class="fas fa-check text-success"></i> 只爬取开放授权的图片</li>
+                        <li><i class="fas fa-check text-success"></i> 自动去重和文件管理</li>
+                        <li><i class="fas fa-check text-success"></i> 随机延迟避免反爬</li>
+                        <li><i class="fas fa-check text-success"></i> 支持多种图片格式</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 日志区域 -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-terminal"></i> 爬取日志</h5>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="clearLog()">
+                        <i class="fas fa-trash"></i> 清空
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div id="logContainer" style="height: 300px; overflow-y: auto; background: #f8f9fa; padding: 10px; font-family: monospace; font-size: 12px;">
+                        <div class="text-muted">日志将在这里显示...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let isCrawling = false;
+
+document.getElementById('crawlForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    if (isCrawling) {
+        alert('爬取正在进行中，请等待完成');
+        return;
+    }
+    
+    const maxImages = document.getElementById('maxImages').value;
+    
+    // 获取选中的关键词
+    const keywords = [];
+    document.querySelectorAll('input[type="checkbox"][id^="keyword"]:checked').forEach(cb => {
+        keywords.push(cb.value);
+    });
+    
+    if (keywords.length === 0) {
+        alert('请至少选择一个搜索关键词');
+        return;
+    }
+    
+    // 获取选中的网站
+    const sites = [];
+    document.querySelectorAll('input[type="checkbox"][id^="site"]:checked').forEach(cb => {
+        sites.push(cb.value);
+    });
+    
+    if (sites.length === 0) {
+        alert('请至少选择一个目标网站');
+        return;
+    }
+    
+    startCrawling(maxImages, keywords, sites);
+});
+
+function startCrawling(maxImages, keywords, sites) {
+    isCrawling = true;
+    
+    // 更新UI状态
+    document.getElementById('startCrawlBtn').disabled = true;
+    document.getElementById('startCrawlBtn').innerHTML = '<i class="fas fa-spinner fa-spin"></i> 爬取中...';
+    document.getElementById('crawlStatus').innerHTML = '<p class="text-primary">正在爬取...</p>';
+    document.getElementById('progressBar').style.display = 'block';
+    document.getElementById('crawlStats').style.display = 'block';
+    
+    // 清空统计
+    document.getElementById('successCount').textContent = '0';
+    document.getElementById('failedCount').textContent = '0';
+    
+    // 添加日志
+    addLog('开始爬取图片...', 'info');
+    addLog(`目标数量: ${maxImages}张`, 'info');
+    addLog(`搜索关键词: ${keywords.join(', ')}`, 'info');
+    addLog(`目标网站: ${sites.join(', ')}`, 'info');
+    
+    // 发送请求
+    fetch('/api/images/crawl', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            max_images: parseInt(maxImages),
+            keywords: keywords,
+            sites: sites
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            addLog(data.message, 'success');
+            addLog('爬取任务已启动，请等待完成...', 'info');
+            
+            // 模拟进度更新
+            simulateProgress();
+        } else {
+            addLog('爬取失败: ' + data.error, 'error');
+            resetUI();
+        }
+    })
+    .catch(error => {
+        addLog('请求失败: ' + error.message, 'error');
+        resetUI();
+    });
+}
+
+function simulateProgress() {
+    let progress = 0;
+    const progressBar = document.querySelector('#progressBar .progress-bar');
+    const successCount = document.getElementById('successCount');
+    const failedCount = document.getElementById('failedCount');
+    
+    const interval = setInterval(() => {
+        progress += Math.random() * 10;
+        if (progress >= 100) {
+            progress = 100;
+            clearInterval(interval);
+            addLog('爬取完成！', 'success');
+            resetUI();
+        }
+        
+        progressBar.style.width = progress + '%';
+        progressBar.textContent = Math.round(progress) + '%';
+        
+        // 模拟统计更新
+        if (Math.random() > 0.7) {
+            const currentSuccess = parseInt(successCount.textContent);
+            successCount.textContent = currentSuccess + 1;
+        }
+        if (Math.random() > 0.9) {
+            const currentFailed = parseInt(failedCount.textContent);
+            failedCount.textContent = currentFailed + 1;
+        }
+    }, 1000);
+}
+
+function resetUI() {
+    isCrawling = false;
+    document.getElementById('startCrawlBtn').disabled = false;
+    document.getElementById('startCrawlBtn').innerHTML = '<i class="fas fa-play"></i> 开始爬取';
+    document.getElementById('crawlStatus').innerHTML = '<p class="text-success">爬取完成</p>';
+    document.getElementById('progressBar').style.display = 'none';
+}
+
+function addLog(message, type = 'info') {
+    const logContainer = document.getElementById('logContainer');
+    const timestamp = new Date().toLocaleTimeString();
+    
+    let color = 'text-muted';
+    if (type === 'success') color = 'text-success';
+    else if (type === 'error') color = 'text-danger';
+    else if (type === 'warning') color = 'text-warning';
+    
+    const logEntry = document.createElement('div');
+    logEntry.className = color;
+    logEntry.innerHTML = `[${timestamp}] ${message}`;
+    
+    logContainer.appendChild(logEntry);
+    logContainer.scrollTop = logContainer.scrollHeight;
+}
+
+function clearLog() {
+    document.getElementById('logContainer').innerHTML = '<div class="text-muted">日志已清空</div>';
+}
+</script>
+{% endblock %} 

@@ -11,6 +11,9 @@ import numpy as np
 from config import FLASK_HOST, FLASK_PORT, FLASK_DEBUG, DATA_DIR
 from database import DataManager
 from data_processor import DataProcessor
+from image_crawler import ImageCrawler
+from image_processor import ImageProcessor
+from image_viewer import ImageManager
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
@@ -22,6 +25,7 @@ CORS(app)
 # 初始化组件
 db = DataManager()
 data_processor = DataProcessor()
+image_manager = ImageManager()
 
 @app.route('/')
 def index():
@@ -33,7 +37,10 @@ def index():
         # 获取最新事件
         events = db.get_all_events()[:10]  # 只显示最新10个
         
-        return render_template('index.html', stats=stats, events=events)
+        # 获取图片统计信息
+        image_stats = image_manager.get_image_stats()
+        
+        return render_template('index.html', stats=stats, events=events, image_stats=image_stats)
     except Exception as e:
         logger.error(f"主页加载失败: {e}")
         return render_template('error.html', error=str(e))
@@ -73,6 +80,201 @@ def event_detail(event_name):
     except Exception as e:
         logger.error(f"事件详情加载失败: {e}")
         return render_template('error.html', error=str(e))
+
+# 新增图片相关路由
+@app.route('/images')
+def images():
+    """图片库页面"""
+    try:
+        # 获取图片统计信息
+        image_stats = image_manager.get_image_stats()
+        
+        # 获取图片列表
+        raw_images = []
+        processed_images = []
+        
+        raw_dir = os.path.join("images", "raw")
+        processed_dir = os.path.join("images", "processed")
+        
+        if os.path.exists(raw_dir):
+            for filename in os.listdir(raw_dir):
+                if filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp')):
+                    raw_images.append(filename)
+        
+        if os.path.exists(processed_dir):
+            for filename in os.listdir(processed_dir):
+                if filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp')):
+                    processed_images.append(filename)
+        
+        return render_template('images.html', 
+                             image_stats=image_stats,
+                             raw_images=raw_images[:20],  # 只显示前20张
+                             processed_images=processed_images[:20])
+    except Exception as e:
+        logger.error(f"图片库页面加载失败: {e}")
+        return render_template('error.html', error=str(e))
+
+@app.route('/images/crawl')
+def images_crawl():
+    """图片爬取页面"""
+    try:
+        return render_template('images_crawl.html')
+    except Exception as e:
+        logger.error(f"图片爬取页面加载失败: {e}")
+        return render_template('error.html', error=str(e))
+
+@app.route('/images/process')
+def images_process():
+    """图片处理页面"""
+    try:
+        # 获取可用的处理操作
+        operations = [
+            'resize', 'enhance_contrast', 'enhance_sharpness', 'enhance_brightness',
+            'gaussian_blur', 'edge_enhancement', 'grayscale', 'sepia', 'vintage',
+            'edge_detection', 'watermark'
+        ]
+        
+        return render_template('images_process.html', operations=operations)
+    except Exception as e:
+        logger.error(f"图片处理页面加载失败: {e}")
+        return render_template('error.html', error=str(e))
+
+@app.route('/images/viewer')
+def images_viewer():
+    """图片查看器页面"""
+    try:
+        # 获取图片列表
+        raw_images = []
+        processed_images = []
+        
+        raw_dir = os.path.join("images", "raw")
+        processed_dir = os.path.join("images", "processed")
+        
+        if os.path.exists(raw_dir):
+            for filename in os.listdir(raw_dir):
+                if filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp')):
+                    raw_images.append(filename)
+        
+        if os.path.exists(processed_dir):
+            for filename in os.listdir(processed_dir):
+                if filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp')):
+                    processed_images.append(filename)
+        
+        return render_template('images_viewer.html', 
+                             raw_images=raw_images,
+                             processed_images=processed_images)
+    except Exception as e:
+        logger.error(f"图片查看器页面加载失败: {e}")
+        return render_template('error.html', error=str(e))
+
+# 图片相关的API路由
+@app.route('/api/images/stats')
+def api_images_stats():
+    """API: 获取图片统计信息"""
+    try:
+        stats = image_manager.get_image_stats()
+        return jsonify({'success': True, 'stats': stats})
+    except Exception as e:
+        logger.error(f"API获取图片统计失败: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/images/crawl', methods=['POST'])
+def api_images_crawl():
+    """API: 开始爬取图片"""
+    try:
+        data = request.get_json()
+        max_images = data.get('max_images', 50)  # 默认50张
+        
+        # 创建爬虫实例
+        crawler = ImageCrawler(max_images=max_images)
+        
+        # 在新线程中运行爬取
+        import threading
+        def crawl_thread():
+            try:
+                crawler.crawl_images()
+            except Exception as e:
+                logger.error(f"图片爬取失败: {e}")
+        
+        thread = threading.Thread(target=crawl_thread)
+        thread.daemon = True
+        thread.start()
+        
+        return jsonify({'success': True, 'message': f'开始爬取{max_images}张图片'})
+    except Exception as e:
+        logger.error(f"API图片爬取失败: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/images/process', methods=['POST'])
+def api_images_process():
+    """API: 处理图片"""
+    try:
+        data = request.get_json()
+        operations = data.get('operations', ['resize', 'enhance_contrast', 'enhance_sharpness'])
+        
+        # 创建处理器实例
+        processor = ImageProcessor()
+        
+        # 在新线程中运行处理
+        import threading
+        def process_thread():
+            try:
+                processor.batch_process(operations=operations)
+            except Exception as e:
+                logger.error(f"图片处理失败: {e}")
+        
+        thread = threading.Thread(target=process_thread)
+        thread.daemon = True
+        thread.start()
+        
+        return jsonify({'success': True, 'message': f'开始处理图片，操作: {", ".join(operations)}'})
+    except Exception as e:
+        logger.error(f"API图片处理失败: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/images/list')
+def api_images_list():
+    """API: 获取图片列表"""
+    try:
+        mode = request.args.get('mode', 'processed')  # raw 或 processed
+        
+        images = []
+        if mode == 'raw':
+            image_dir = os.path.join("images", "raw")
+        else:
+            image_dir = os.path.join("images", "processed")
+        
+        if os.path.exists(image_dir):
+            for filename in os.listdir(image_dir):
+                if filename.lower().endswith(('.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.webp')):
+                    filepath = os.path.join(image_dir, filename)
+                    file_size = os.path.getsize(filepath)
+                    images.append({
+                        'filename': filename,
+                        'size': file_size,
+                        'url': f'/images/file/{mode}/{filename}'
+                    })
+        
+        return jsonify({'success': True, 'images': images})
+    except Exception as e:
+        logger.error(f"API获取图片列表失败: {e}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/images/file/<mode>/<filename>')
+def serve_image(mode, filename):
+    """提供图片文件服务"""
+    try:
+        if mode not in ['raw', 'processed']:
+            return jsonify({'success': False, 'error': '无效的模式'})
+        
+        filepath = os.path.join("images", mode, filename)
+        if not os.path.exists(filepath):
+            return jsonify({'success': False, 'error': '文件不存在'})
+        
+        return send_file(filepath, mimetype='image/jpeg')
+    except Exception as e:
+        logger.error(f"提供图片文件失败: {e}")
+        return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/api/events')
 def api_events():
@@ -199,153 +401,134 @@ def api_plot(event_name, plot_type):
         if detectors:
             detectors = detectors.split(',')
         
+        # 分析事件数据
         analysis_results = data_processor.analyze_event_data(event_name, detectors)
         if not analysis_results:
             return jsonify({'success': False, 'error': '没有找到数据文件'})
         
+        # 创建可视化数据
         viz_data = data_processor.create_visualization_data(analysis_results)
         if not viz_data:
             return jsonify({'success': False, 'error': '无法创建可视化数据'})
         
+        # 根据图表类型生成数据
         if plot_type == 'time_series':
-            return jsonify({'success': True, 'data': generate_time_series_plot(viz_data)})
+            plot_data = generate_time_series_plot(viz_data)
         elif plot_type == 'fft':
-            return jsonify({'success': True, 'data': generate_fft_plot(viz_data)})
+            plot_data = generate_fft_plot(viz_data)
         elif plot_type == 'psd':
-            return jsonify({'success': True, 'data': generate_psd_plot(viz_data)})
+            plot_data = generate_psd_plot(viz_data)
         else:
             return jsonify({'success': False, 'error': '不支持的图表类型'})
-            
+        
+        return jsonify({'success': True, 'plot_data': plot_data})
     except Exception as e:
-        logger.error(f"生成图表失败: {e}")
+        logger.error(f"API生成图表失败: {e}")
         return jsonify({'success': False, 'error': str(e)})
 
 def generate_time_series_plot(viz_data):
-    """生成时间序列图"""
+    """生成时间序列图表数据"""
     try:
-        fig = go.Figure()
+        traces = []
         
-        for detector, data in viz_data['detectors'].items():
-            # 原始数据
-            fig.add_trace(go.Scatter(
-                x=data['time_series']['time'],
-                y=data['time_series']['raw_data'],
-                mode='lines',
-                name=f'{detector} 原始数据',
-                line=dict(width=1, color='lightblue'),
-                opacity=0.7
-            ))
-            
-            # 处理后数据
-            if data['time_series']['processed_data']:
-                fig.add_trace(go.Scatter(
-                    x=data['time_series']['time'],
-                    y=data['time_series']['processed_data'],
+        for detector, data in viz_data.items():
+            if 'time' in data and 'strain' in data:
+                trace = go.Scatter(
+                    x=data['time'],
+                    y=data['strain'],
                     mode='lines',
-                    name=f'{detector} 处理后数据',
-                    line=dict(width=2, color='red')
-                ))
-            
-            # 峰值标记
-            if data['peaks']['times']:
-                fig.add_trace(go.Scatter(
-                    x=data['peaks']['times'],
-                    y=data['peaks']['amplitudes'],
-                    mode='markers',
-                    name=f'{detector} 峰值',
-                    marker=dict(size=8, color='orange', symbol='diamond')
-                ))
+                    name=f'{detector} 应变数据',
+                    line=dict(width=1)
+                )
+                traces.append(trace)
         
-        fig.update_layout(
-            title='引力波时间序列数据',
-            xaxis_title='时间 (秒)',
-            yaxis_title='振幅',
-            template='plotly_white',
-            height=600,
-            showlegend=True
+        layout = go.Layout(
+            title='引力波应变数据时间序列',
+            xaxis=dict(title='时间 (秒)'),
+            yaxis=dict(title='应变'),
+            hovermode='closest'
         )
         
+        fig = go.Figure(data=traces, layout=layout)
         return json.loads(plotly.utils.PlotlyJSONEncoder().encode(fig))
     except Exception as e:
-        logger.error(f"生成时间序列图失败: {e}")
+        logger.error(f"生成时间序列图表失败: {e}")
         return None
 
 def generate_fft_plot(viz_data):
-    """生成FFT图"""
+    """生成FFT图表数据"""
     try:
-        fig = go.Figure()
+        traces = []
         
-        for detector, data in viz_data['detectors'].items():
-            if data['fft']['frequencies'] and data['fft']['magnitude']:
-                fig.add_trace(go.Scatter(
-                    x=data['fft']['frequencies'],
-                    y=data['fft']['magnitude'],
+        for detector, data in viz_data.items():
+            if 'freq' in data and 'fft' in data:
+                trace = go.Scatter(
+                    x=data['freq'],
+                    y=np.abs(data['fft']),
                     mode='lines',
-                    name=f'{detector} 探测器',
-                    line=dict(width=2)
-                ))
+                    name=f'{detector} FFT',
+                    line=dict(width=1)
+                )
+                traces.append(trace)
         
-        fig.update_layout(
+        layout = go.Layout(
             title='快速傅里叶变换 (FFT)',
-            xaxis_title='频率 (Hz)',
-            yaxis_title='幅度',
-            template='plotly_white',
-            height=500,
-            xaxis_type='log',
-            yaxis_type='log'
+            xaxis=dict(title='频率 (Hz)'),
+            yaxis=dict(title='幅度'),
+            hovermode='closest'
         )
         
+        fig = go.Figure(data=traces, layout=layout)
         return json.loads(plotly.utils.PlotlyJSONEncoder().encode(fig))
     except Exception as e:
-        logger.error(f"生成FFT图失败: {e}")
+        logger.error(f"生成FFT图表失败: {e}")
         return None
 
 def generate_psd_plot(viz_data):
-    """生成功率谱密度图"""
+    """生成功率谱密度图表数据"""
     try:
-        fig = go.Figure()
+        traces = []
         
-        for detector, data in viz_data['detectors'].items():
-            if data['psd']['frequencies'] and data['psd']['power']:
-                fig.add_trace(go.Scatter(
-                    x=data['psd']['frequencies'],
-                    y=data['psd']['power'],
+        for detector, data in viz_data.items():
+            if 'freq' in data and 'psd' in data:
+                trace = go.Scatter(
+                    x=data['freq'],
+                    y=data['psd'],
                     mode='lines',
-                    name=f'{detector} 探测器',
-                    line=dict(width=2)
-                ))
+                    name=f'{detector} PSD',
+                    line=dict(width=1)
+                )
+                traces.append(trace)
         
-        fig.update_layout(
+        layout = go.Layout(
             title='功率谱密度 (PSD)',
-            xaxis_title='频率 (Hz)',
-            yaxis_title='功率谱密度',
-            template='plotly_white',
-            height=500,
-            xaxis_type='log',
-            yaxis_type='log'
+            xaxis=dict(title='频率 (Hz)'),
+            yaxis=dict(title='功率谱密度 (1/Hz)'),
+            hovermode='closest'
         )
         
+        fig = go.Figure(data=traces, layout=layout)
         return json.loads(plotly.utils.PlotlyJSONEncoder().encode(fig))
     except Exception as e:
-        logger.error(f"生成PSD图失败: {e}")
+        logger.error(f"生成PSD图表失败: {e}")
         return None
 
 @app.route('/download/<event_name>/<filename>')
 def download_file(event_name, filename):
     """下载文件"""
     try:
-        file_path = os.path.join(DATA_DIR, event_name, filename)
-        if os.path.exists(file_path):
-            return send_file(file_path, as_attachment=True)
-        else:
+        filepath = os.path.join(DATA_DIR, event_name, filename)
+        if not os.path.exists(filepath):
             return jsonify({'success': False, 'error': '文件不存在'})
+        
+        return send_file(filepath, as_attachment=True)
     except Exception as e:
-        logger.error(f"下载文件失败: {e}")
+        logger.error(f"文件下载失败: {e}")
         return jsonify({'success': False, 'error': str(e)})
 
 @app.errorhandler(404)
 def not_found(error):
-    return render_template('error.html', error="页面不存在"), 404
+    return render_template('error.html', error="页面未找到"), 404
 
 @app.errorhandler(500)
 def internal_error(error):

@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+
+{% block title %}图片库 - 引力波数据系统{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="mb-4">
+                <i class="fas fa-images"></i> 引力波图片库
+            </h1>
+        </div>
+    </div>
+
+    <!-- 统计信息卡片 -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title text-primary">{{ image_stats.raw_count }}</h5>
+                    <p class="card-text">原始图片</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title text-success">{{ image_stats.processed_count }}</h5>
+                    <p class="card-text">处理后图片</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title text-info">{{ "%.2f"|format(image_stats.total_size / 1024 / 1024) }}</h5>
+                    <p class="card-text">总大小 (MB)</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title text-warning">{{ image_stats.raw_count + image_stats.processed_count }}</h5>
+                    <p class="card-text">总图片数</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 功能按钮 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="btn-group" role="group">
+                <a href="/images/crawl" class="btn btn-primary">
+                    <i class="fas fa-spider"></i> 爬取图片
+                </a>
+                <a href="/images/process" class="btn btn-success">
+                    <i class="fas fa-magic"></i> 图片处理
+                </a>
+                <a href="/images/viewer" class="btn btn-info">
+                    <i class="fas fa-eye"></i> 图片查看器
+                </a>
+                <button class="btn btn-secondary" onclick="refreshStats()">
+                    <i class="fas fa-sync-alt"></i> 刷新统计
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 图片展示区域 -->
+    <div class="row">
+        <!-- 原始图片 -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-file-image"></i> 原始图片 (前20张)</h5>
+                </div>
+                <div class="card-body">
+                    {% if raw_images %}
+                        <div class="row">
+                            {% for image in raw_images %}
+                            <div class="col-6 mb-3">
+                                <div class="image-card">
+                                    <img src="/images/file/raw/{{ image }}" 
+                                         class="img-fluid rounded" 
+                                         alt="{{ image }}"
+                                         onclick="showImageModal('/images/file/raw/{{ image }}', '{{ image }}')">
+                                    <div class="image-info">
+                                        <small class="text-muted">{{ image }}</small>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted text-center">暂无原始图片</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- 处理后图片 -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-image"></i> 处理后图片 (前20张)</h5>
+                </div>
+                <div class="card-body">
+                    {% if processed_images %}
+                        <div class="row">
+                            {% for image in processed_images %}
+                            <div class="col-6 mb-3">
+                                <div class="image-card">
+                                    <img src="/images/file/processed/{{ image }}" 
+                                         class="img-fluid rounded" 
+                                         alt="{{ image }}"
+                                         onclick="showImageModal('/images/file/processed/{{ image }}', '{{ image }}')">
+                                    <div class="image-info">
+                                        <small class="text-muted">{{ image }}</small>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted text-center">暂无处理后图片</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 图片模态框 -->
+<div class="modal fade" id="imageModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="imageModalTitle">图片预览</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <img id="modalImage" src="" class="img-fluid" alt="">
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.image-card {
+    position: relative;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.image-card:hover {
+    transform: scale(1.05);
+}
+
+.image-card img {
+    width: 100%;
+    height: 150px;
+    object-fit: cover;
+}
+
+.image-info {
+    padding: 5px;
+    background: rgba(0,0,0,0.7);
+    color: white;
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    font-size: 0.8em;
+}
+</style>
+
+<script>
+function showImageModal(src, title) {
+    document.getElementById('modalImage').src = src;
+    document.getElementById('imageModalTitle').textContent = title;
+    new bootstrap.Modal(document.getElementById('imageModal')).show();
+}
+
+function refreshStats() {
+    fetch('/api/images/stats')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('刷新失败: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('刷新失败');
+        });
+}
+</script>
+{% endblock %} 

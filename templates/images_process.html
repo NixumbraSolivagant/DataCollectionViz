@@ -1,0 +1,385 @@
+{% extends "base.html" %}
+
+{% block title %}图片处理 - 引力波数据系统{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="mb-4">
+                <i class="fas fa-magic"></i> 图片处理
+            </h1>
+        </div>
+    </div>
+
+    <!-- 处理配置 -->
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-cog"></i> 处理配置</h5>
+                </div>
+                <div class="card-body">
+                    <form id="processForm">
+                        <div class="mb-3">
+                            <label class="form-label">选择处理操作</label>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6 class="text-primary">基本处理</h6>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" value="resize" id="op1" checked>
+                                        <label class="form-check-label" for="op1">
+                                            <i class="fas fa-expand-arrows-alt"></i> 调整大小
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" value="enhance_contrast" id="op2" checked>
+                                        <label class="form-check-label" for="op2">
+                                            <i class="fas fa-adjust"></i> 增强对比度
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" value="enhance_sharpness" id="op3" checked>
+                                        <label class="form-check-label" for="op3">
+                                            <i class="fas fa-cut"></i> 增强锐度
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" value="enhance_brightness" id="op4">
+                                        <label class="form-check-label" for="op4">
+                                            <i class="fas fa-sun"></i> 增强亮度
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6 class="text-success">特效处理</h6>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" value="grayscale" id="op5">
+                                        <label class="form-check-label" for="op5">
+                                            <i class="fas fa-circle"></i> 灰度图
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" value="sepia" id="op6">
+                                        <label class="form-check-label" for="op6">
+                                            <i class="fas fa-palette"></i> 复古滤镜
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" value="vintage" id="op7">
+                                        <label class="form-check-label" for="op7">
+                                            <i class="fas fa-camera-retro"></i> 复古效果
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" value="watermark" id="op8">
+                                        <label class="form-check-label" for="op8">
+                                            <i class="fas fa-stamp"></i> 添加水印
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="row mt-3">
+                                <div class="col-md-6">
+                                    <h6 class="text-warning">高级处理</h6>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" value="gaussian_blur" id="op9">
+                                        <label class="form-check-label" for="op9">
+                                            <i class="fas fa-blur"></i> 高斯模糊
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" value="edge_enhancement" id="op10">
+                                        <label class="form-check-label" for="op10">
+                                            <i class="fas fa-border-all"></i> 边缘增强
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" value="edge_detection" id="op11">
+                                        <label class="form-check-label" for="op11">
+                                            <i class="fas fa-vector-square"></i> 边缘检测
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="quality" class="form-label">输出质量</label>
+                            <input type="range" class="form-range" id="quality" min="50" max="100" value="85">
+                            <div class="form-text">当前质量: <span id="qualityValue">85</span>%</div>
+                        </div>
+
+                        <button type="submit" class="btn btn-success" id="startProcessBtn">
+                            <i class="fas fa-play"></i> 开始处理
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="history.back()">
+                            <i class="fas fa-arrow-left"></i> 返回
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- 状态面板 -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-info-circle"></i> 处理状态</h5>
+                </div>
+                <div class="card-body">
+                    <div id="processStatus">
+                        <p class="text-muted">等待开始...</p>
+                    </div>
+                    
+                    <div class="progress mb-3" style="display: none;" id="progressBar">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" 
+                             role="progressbar" style="width: 0%"></div>
+                    </div>
+                    
+                    <div id="processStats" style="display: none;">
+                        <div class="row text-center">
+                            <div class="col-6">
+                                <h6 class="text-success" id="processedCount">0</h6>
+                                <small>已处理</small>
+                            </div>
+                            <div class="col-6">
+                                <h6 class="text-danger" id="failedCount">0</h6>
+                                <small>失败</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 处理说明 -->
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h5><i class="fas fa-info-circle"></i> 处理说明</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled">
+                        <li><i class="fas fa-check text-success"></i> 调整大小: 缩放到800x600</li>
+                        <li><i class="fas fa-check text-success"></i> 增强对比度: 提高1.2倍</li>
+                        <li><i class="fas fa-check text-success"></i> 增强锐度: 提高1.1倍</li>
+                        <li><i class="fas fa-check text-success"></i> 自动保存为JPEG格式</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 预览区域 -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-eye"></i> 处理预览</h5>
+                    <button class="btn btn-sm btn-outline-primary" onclick="loadPreviewImages()">
+                        <i class="fas fa-sync-alt"></i> 刷新预览
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div id="previewContainer" class="row">
+                        <div class="col-12 text-center">
+                            <p class="text-muted">点击"刷新预览"加载图片预览</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 日志区域 -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-terminal"></i> 处理日志</h5>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="clearLog()">
+                        <i class="fas fa-trash"></i> 清空
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div id="logContainer" style="height: 200px; overflow-y: auto; background: #f8f9fa; padding: 10px; font-family: monospace; font-size: 12px;">
+                        <div class="text-muted">日志将在这里显示...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let isProcessing = false;
+
+// 质量滑块
+document.getElementById('quality').addEventListener('input', function() {
+    document.getElementById('qualityValue').textContent = this.value;
+});
+
+document.getElementById('processForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    if (isProcessing) {
+        alert('处理正在进行中，请等待完成');
+        return;
+    }
+    
+    // 获取选中的操作
+    const operations = [];
+    document.querySelectorAll('input[type="checkbox"][id^="op"]:checked').forEach(cb => {
+        operations.push(cb.value);
+    });
+    
+    if (operations.length === 0) {
+        alert('请至少选择一个处理操作');
+        return;
+    }
+    
+    const quality = document.getElementById('quality').value;
+    
+    startProcessing(operations, quality);
+});
+
+function startProcessing(operations, quality) {
+    isProcessing = true;
+    
+    // 更新UI状态
+    document.getElementById('startProcessBtn').disabled = true;
+    document.getElementById('startProcessBtn').innerHTML = '<i class="fas fa-spinner fa-spin"></i> 处理中...';
+    document.getElementById('processStatus').innerHTML = '<p class="text-primary">正在处理...</p>';
+    document.getElementById('progressBar').style.display = 'block';
+    document.getElementById('processStats').style.display = 'block';
+    
+    // 清空统计
+    document.getElementById('processedCount').textContent = '0';
+    document.getElementById('failedCount').textContent = '0';
+    
+    // 添加日志
+    addLog('开始处理图片...', 'info');
+    addLog(`处理操作: ${operations.join(', ')}`, 'info');
+    addLog(`输出质量: ${quality}%`, 'info');
+    
+    // 发送请求
+    fetch('/api/images/process', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            operations: operations,
+            quality: parseInt(quality)
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            addLog(data.message, 'success');
+            addLog('处理任务已启动，请等待完成...', 'info');
+            
+            // 模拟进度更新
+            simulateProgress();
+        } else {
+            addLog('处理失败: ' + data.error, 'error');
+            resetUI();
+        }
+    })
+    .catch(error => {
+        addLog('请求失败: ' + error.message, 'error');
+        resetUI();
+    });
+}
+
+function simulateProgress() {
+    let progress = 0;
+    const progressBar = document.querySelector('#progressBar .progress-bar');
+    const processedCount = document.getElementById('processedCount');
+    const failedCount = document.getElementById('failedCount');
+    
+    const interval = setInterval(() => {
+        progress += Math.random() * 15;
+        if (progress >= 100) {
+            progress = 100;
+            clearInterval(interval);
+            addLog('处理完成！', 'success');
+            resetUI();
+        }
+        
+        progressBar.style.width = progress + '%';
+        progressBar.textContent = Math.round(progress) + '%';
+        
+        // 模拟统计更新
+        if (Math.random() > 0.6) {
+            const currentProcessed = parseInt(processedCount.textContent);
+            processedCount.textContent = currentProcessed + 1;
+        }
+        if (Math.random() > 0.95) {
+            const currentFailed = parseInt(failedCount.textContent);
+            failedCount.textContent = currentFailed + 1;
+        }
+    }, 800);
+}
+
+function resetUI() {
+    isProcessing = false;
+    document.getElementById('startProcessBtn').disabled = false;
+    document.getElementById('startProcessBtn').innerHTML = '<i class="fas fa-play"></i> 开始处理';
+    document.getElementById('processStatus').innerHTML = '<p class="text-success">处理完成</p>';
+    document.getElementById('progressBar').style.display = 'none';
+}
+
+function loadPreviewImages() {
+    const container = document.getElementById('previewContainer');
+    container.innerHTML = '<div class="col-12 text-center"><i class="fas fa-spinner fa-spin"></i> 加载中...</div>';
+    
+    fetch('/api/images/list?mode=raw&limit=6')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.images.length > 0) {
+                container.innerHTML = '';
+                data.images.slice(0, 6).forEach(image => {
+                    const col = document.createElement('div');
+                    col.className = 'col-md-4 mb-3';
+                    col.innerHTML = `
+                        <div class="card">
+                            <img src="${image.url}" class="card-img-top" alt="${image.filename}" style="height: 150px; object-fit: cover;">
+                            <div class="card-body">
+                                <small class="text-muted">${image.filename}</small>
+                            </div>
+                        </div>
+                    `;
+                    container.appendChild(col);
+                });
+            } else {
+                container.innerHTML = '<div class="col-12 text-center"><p class="text-muted">暂无图片可预览</p></div>';
+            }
+        })
+        .catch(error => {
+            container.innerHTML = '<div class="col-12 text-center"><p class="text-danger">加载失败</p></div>';
+        });
+}
+
+function addLog(message, type = 'info') {
+    const logContainer = document.getElementById('logContainer');
+    const timestamp = new Date().toLocaleTimeString();
+    
+    let color = 'text-muted';
+    if (type === 'success') color = 'text-success';
+    else if (type === 'error') color = 'text-danger';
+    else if (type === 'warning') color = 'text-warning';
+    
+    const logEntry = document.createElement('div');
+    logEntry.className = color;
+    logEntry.innerHTML = `[${timestamp}] ${message}`;
+    
+    logContainer.appendChild(logEntry);
+    logContainer.scrollTop = logContainer.scrollHeight;
+}
+
+function clearLog() {
+    document.getElementById('logContainer').innerHTML = '<div class="text-muted">日志已清空</div>';
+}
+</script>
+{% endblock %} 

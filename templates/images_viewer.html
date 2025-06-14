@@ -1,0 +1,382 @@
+{% extends "base.html" %}
+
+{% block title %}图片查看器 - 引力波数据系统{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="mb-4">
+                <i class="fas fa-eye"></i> 图片查看器
+            </h1>
+        </div>
+    </div>
+
+    <!-- 控制面板 -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-3">
+                            <label for="imageMode" class="form-label">图片模式</label>
+                            <select class="form-select" id="imageMode" onchange="changeMode()">
+                                <option value="processed">处理后图片</option>
+                                <option value="raw">原始图片</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="zoomLevel" class="form-label">缩放级别</label>
+                            <input type="range" class="form-range" id="zoomLevel" min="0.1" max="3" step="0.1" value="1" onchange="updateZoom()">
+                            <small class="text-muted">当前: <span id="zoomValue">100</span>%</small>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">导航</label>
+                            <div class="btn-group" role="group">
+                                <button class="btn btn-outline-primary" onclick="prevImage()">
+                                    <i class="fas fa-chevron-left"></i> 上一张
+                                </button>
+                                <button class="btn btn-outline-primary" onclick="nextImage()">
+                                    下一张 <i class="fas fa-chevron-right"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">操作</label>
+                            <div class="btn-group" role="group">
+                                <button class="btn btn-outline-secondary" onclick="resetZoom()">
+                                    <i class="fas fa-expand"></i> 重置
+                                </button>
+                                <button class="btn btn-outline-secondary" onclick="refreshImages()">
+                                    <i class="fas fa-sync-alt"></i> 刷新
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 图片显示区域 -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5><i class="fas fa-image"></i> 图片显示</h5>
+                    <div>
+                        <span class="badge bg-primary" id="imageCounter">0 / 0</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div id="imageContainer" class="text-center" style="min-height: 500px; background: #f8f9fa; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                        <div class="text-muted">
+                            <i class="fas fa-image fa-3x mb-3"></i>
+                            <p>点击"刷新"加载图片</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 缩略图区域 -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-th"></i> 缩略图</h5>
+                </div>
+                <div class="card-body">
+                    <div id="thumbnailContainer" class="row">
+                        <div class="col-12 text-center">
+                            <p class="text-muted">加载缩略图中...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 图片信息 -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-info-circle"></i> 图片信息</h5>
+                </div>
+                <div class="card-body">
+                    <div id="imageInfo" class="row">
+                        <div class="col-md-3">
+                            <strong>文件名:</strong>
+                            <div id="fileName" class="text-muted">-</div>
+                        </div>
+                        <div class="col-md-3">
+                            <strong>文件大小:</strong>
+                            <div id="fileSize" class="text-muted">-</div>
+                        </div>
+                        <div class="col-md-3">
+                            <strong>图片尺寸:</strong>
+                            <div id="imageSize" class="text-muted">-</div>
+                        </div>
+                        <div class="col-md-3">
+                            <strong>当前缩放:</strong>
+                            <div id="currentZoom" class="text-muted">-</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.image-viewer {
+    position: relative;
+    overflow: hidden;
+    cursor: grab;
+}
+
+.image-viewer:active {
+    cursor: grabbing;
+}
+
+.image-viewer img {
+    max-width: 100%;
+    max-height: 100%;
+    transition: transform 0.3s ease;
+}
+
+.thumbnail-item {
+    cursor: pointer;
+    transition: transform 0.2s;
+    border: 2px solid transparent;
+}
+
+.thumbnail-item:hover {
+    transform: scale(1.05);
+}
+
+.thumbnail-item.active {
+    border-color: #007bff;
+}
+
+.thumbnail-item img {
+    width: 100%;
+    height: 100px;
+    object-fit: cover;
+    border-radius: 4px;
+}
+</style>
+
+<script>
+let currentImages = [];
+let currentIndex = 0;
+let currentMode = 'processed';
+let currentZoom = 1.0;
+
+// 键盘快捷键
+document.addEventListener('keydown', function(e) {
+    switch(e.key) {
+        case 'ArrowLeft':
+            e.preventDefault();
+            prevImage();
+            break;
+        case 'ArrowRight':
+            e.preventDefault();
+            nextImage();
+            break;
+        case 'ArrowUp':
+            e.preventDefault();
+            zoomIn();
+            break;
+        case 'ArrowDown':
+            e.preventDefault();
+            zoomOut();
+            break;
+        case 'Escape':
+            e.preventDefault();
+            resetZoom();
+            break;
+    }
+});
+
+function changeMode() {
+    currentMode = document.getElementById('imageMode').value;
+    currentIndex = 0;
+    loadImages();
+}
+
+function updateZoom() {
+    const zoomSlider = document.getElementById('zoomLevel');
+    currentZoom = parseFloat(zoomSlider.value);
+    document.getElementById('zoomValue').textContent = Math.round(currentZoom * 100);
+    displayCurrentImage();
+}
+
+function zoomIn() {
+    const zoomSlider = document.getElementById('zoomLevel');
+    const newZoom = Math.min(3, currentZoom + 0.1);
+    zoomSlider.value = newZoom;
+    updateZoom();
+}
+
+function zoomOut() {
+    const zoomSlider = document.getElementById('zoomLevel');
+    const newZoom = Math.max(0.1, currentZoom - 0.1);
+    zoomSlider.value = newZoom;
+    updateZoom();
+}
+
+function resetZoom() {
+    const zoomSlider = document.getElementById('zoomLevel');
+    zoomSlider.value = 1;
+    updateZoom();
+}
+
+function prevImage() {
+    if (currentImages.length > 0) {
+        currentIndex = (currentIndex - 1 + currentImages.length) % currentImages.length;
+        displayCurrentImage();
+        updateThumbnailSelection();
+    }
+}
+
+function nextImage() {
+    if (currentImages.length > 0) {
+        currentIndex = (currentIndex + 1) % currentImages.length;
+        displayCurrentImage();
+        updateThumbnailSelection();
+    }
+}
+
+function refreshImages() {
+    loadImages();
+}
+
+function loadImages() {
+    const container = document.getElementById('imageContainer');
+    container.innerHTML = '<div class="text-muted"><i class="fas fa-spinner fa-spin fa-2x"></i><p>加载中...</p></div>';
+    
+    fetch(`/api/images/list?mode=${currentMode}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                currentImages = data.images;
+                currentIndex = 0;
+                
+                if (currentImages.length > 0) {
+                    displayCurrentImage();
+                    loadThumbnails();
+                } else {
+                    container.innerHTML = '<div class="text-muted"><i class="fas fa-image fa-2x"></i><p>暂无图片</p></div>';
+                    document.getElementById('thumbnailContainer').innerHTML = '<div class="col-12 text-center"><p class="text-muted">暂无图片</p></div>';
+                }
+                
+                updateImageCounter();
+            } else {
+                container.innerHTML = '<div class="text-danger"><i class="fas fa-exclamation-triangle fa-2x"></i><p>加载失败</p></div>';
+            }
+        })
+        .catch(error => {
+            container.innerHTML = '<div class="text-danger"><i class="fas fa-exclamation-triangle fa-2x"></i><p>加载失败</p></div>';
+        });
+}
+
+function displayCurrentImage() {
+    if (currentImages.length === 0) return;
+    
+    const image = currentImages[currentIndex];
+    const container = document.getElementById('imageContainer');
+    
+    container.innerHTML = `
+        <div class="image-viewer" style="width: 100%; height: 500px; display: flex; align-items: center; justify-content: center;">
+            <img src="${image.url}" 
+                 alt="${image.filename}" 
+                 style="transform: scale(${currentZoom}); max-width: 100%; max-height: 100%; object-fit: contain;">
+        </div>
+    `;
+    
+    // 更新图片信息
+    updateImageInfo(image);
+    updateImageCounter();
+}
+
+function loadThumbnails() {
+    const container = document.getElementById('thumbnailContainer');
+    
+    if (currentImages.length === 0) {
+        container.innerHTML = '<div class="col-12 text-center"><p class="text-muted">暂无图片</p></div>';
+        return;
+    }
+    
+    container.innerHTML = '';
+    
+    currentImages.forEach((image, index) => {
+        const col = document.createElement('div');
+        col.className = 'col-md-2 col-sm-3 col-4 mb-3';
+        col.innerHTML = `
+            <div class="thumbnail-item ${index === currentIndex ? 'active' : ''}" onclick="selectImage(${index})">
+                <img src="${image.url}" alt="${image.filename}">
+                <div class="mt-1">
+                    <small class="text-muted">${image.filename}</small>
+                </div>
+            </div>
+        `;
+        container.appendChild(col);
+    });
+}
+
+function selectImage(index) {
+    currentIndex = index;
+    displayCurrentImage();
+    updateThumbnailSelection();
+}
+
+function updateThumbnailSelection() {
+    const thumbnails = document.querySelectorAll('.thumbnail-item');
+    thumbnails.forEach((thumb, index) => {
+        if (index === currentIndex) {
+            thumb.classList.add('active');
+        } else {
+            thumb.classList.remove('active');
+        }
+    });
+}
+
+function updateImageCounter() {
+    const counter = document.getElementById('imageCounter');
+    if (currentImages.length > 0) {
+        counter.textContent = `${currentIndex + 1} / ${currentImages.length}`;
+    } else {
+        counter.textContent = '0 / 0';
+    }
+}
+
+function updateImageInfo(image) {
+    document.getElementById('fileName').textContent = image.filename;
+    document.getElementById('fileSize').textContent = formatFileSize(image.size);
+    document.getElementById('currentZoom').textContent = Math.round(currentZoom * 100) + '%';
+    
+    // 获取图片尺寸
+    const img = new Image();
+    img.onload = function() {
+        document.getElementById('imageSize').textContent = `${this.width} × ${this.height}`;
+    };
+    img.src = image.url;
+}
+
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+// 页面加载时初始化
+document.addEventListener('DOMContentLoaded', function() {
+    loadImages();
+});
+</script>
+{% endblock %} 

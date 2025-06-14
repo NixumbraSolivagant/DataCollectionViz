@@ -15,26 +15,32 @@
             <div class="card-body">
                 <p class="lead">
                     欢迎使用引力波数据爬虫与可视化系统！本系统可以爬取GWOSC（引力波开放科学中心）的引力波事件数据，
-                    并提供强大的数据分析和可视化功能。
+                    并提供强大的数据分析和可视化功能。同时支持图片爬取和处理功能。
                 </p>
                 
                 <div class="row mt-4">
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <div class="stats-card text-center">
                             <div class="stats-number">{{ stats.total_events }}</div>
                             <div class="stats-label">总事件数</div>
                         </div>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <div class="stats-card text-center">
                             <div class="stats-number">{{ stats.total_files }}</div>
                             <div class="stats-label">数据文件数</div>
                         </div>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <div class="stats-card text-center">
                             <div class="stats-number">{{ stats.detectors|length }}</div>
                             <div class="stats-label">探测器数</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stats-card text-center">
+                            <div class="stats-number">{{ image_stats.raw_count + image_stats.processed_count }}</div>
+                            <div class="stats-label">图片总数</div>
                         </div>
                     </div>
                 </div>
@@ -115,7 +121,7 @@
             <div class="card-header">
                 <h4 class="mb-0">
                     <i class="fas fa-cogs me-2"></i>
-                    系统功能
+                    数据系统功能
                 </h4>
             </div>
             <div class="card-body">
@@ -126,7 +132,7 @@
                     </li>
                     <li class="list-group-item">
                         <i class="fas fa-database text-success me-2"></i>
-                        <strong>数据存储</strong> - 本地文件存储事件信息和文件记录
+                        <strong>数据存储</strong> - MySQL数据库存储事件信息和文件记录
                     </li>
                     <li class="list-group-item">
                         <i class="fas fa-chart-line text-info me-2"></i>
@@ -145,6 +151,60 @@
         </div>
     </div>
     
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">
+                    <i class="fas fa-images me-2"></i>
+                    图片系统功能
+                </h4>
+            </div>
+            <div class="card-body">
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item">
+                        <i class="fas fa-spider text-primary me-2"></i>
+                        <strong>图片爬取</strong> - 从多个网站爬取引力波相关图片
+                    </li>
+                    <li class="list-group-item">
+                        <i class="fas fa-magic text-success me-2"></i>
+                        <strong>图片处理</strong> - 批量处理、滤镜效果、增强优化
+                    </li>
+                    <li class="list-group-item">
+                        <i class="fas fa-eye text-info me-2"></i>
+                        <strong>图片查看</strong> - 在线查看器，支持缩放和导航
+                    </li>
+                    <li class="list-group-item">
+                        <i class="fas fa-chart-pie text-warning me-2"></i>
+                        <strong>统计分析</strong> - 图片数量、大小、格式统计
+                    </li>
+                    <li class="list-group-item">
+                        <i class="fas fa-download text-danger me-2"></i>
+                        <strong>数据导出</strong> - 元数据导出和管理
+                    </li>
+                </ul>
+                
+                <div class="mt-3">
+                    <div class="row text-center">
+                        <div class="col-4">
+                            <h6 class="text-primary">{{ image_stats.raw_count }}</h6>
+                            <small>原始图片</small>
+                        </div>
+                        <div class="col-4">
+                            <h6 class="text-success">{{ image_stats.processed_count }}</h6>
+                            <small>处理后</small>
+                        </div>
+                        <div class="col-4">
+                            <h6 class="text-info">{{ "%.1f"|format(image_stats.total_size / 1024 / 1024) }}</h6>
+                            <small>大小(MB)</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
     <div class="col-md-6">
         <div class="card">
             <div class="card-header">
@@ -182,6 +242,52 @@
             </div>
         </div>
     </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">
+                    <i class="fas fa-rocket me-2"></i>
+                    快速操作
+                </h4>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-6 mb-3">
+                        <a href="/images" class="btn btn-outline-primary w-100">
+                            <i class="fas fa-images me-1"></i>图片库
+                        </a>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <a href="/images/crawl" class="btn btn-outline-success w-100">
+                            <i class="fas fa-spider me-1"></i>爬取图片
+                        </a>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <a href="/images/process" class="btn btn-outline-info w-100">
+                            <i class="fas fa-magic me-1"></i>图片处理
+                        </a>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <a href="/images/viewer" class="btn btn-outline-warning w-100">
+                            <i class="fas fa-eye me-1"></i>图片查看器
+                        </a>
+                    </div>
+                </div>
+                
+                <hr>
+                
+                <div class="text-center">
+                    <button class="btn btn-primary me-2" onclick="startImageCrawler()">
+                        <i class="fas fa-spider me-1"></i>爬取图片
+                    </button>
+                    <button class="btn btn-info" onclick="processImages()">
+                        <i class="fas fa-magic me-1"></i>处理图片
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
@@ -199,8 +305,63 @@ function startCrawler() {
     }, 3000);
 }
 
-function refreshData() {
+function startImageCrawler() {
     showLoading();
+    showAlert('开始爬取图片，这可能需要一些时间...', 'info');
+    
+    fetch('/api/images/crawl', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            max_images: 50
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        if (data.success) {
+            showAlert('图片爬取任务已启动！', 'success');
+        } else {
+            showAlert('爬取失败: ' + data.error, 'error');
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        showAlert('请求失败: ' + error.message, 'error');
+    });
+}
+
+function processImages() {
+    showLoading();
+    showAlert('开始处理图片，这可能需要一些时间...', 'info');
+    
+    fetch('/api/images/process', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            operations: ['resize', 'enhance_contrast', 'enhance_sharpness']
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoading();
+        if (data.success) {
+            showAlert('图片处理任务已启动！', 'success');
+        } else {
+            showAlert('处理失败: ' + data.error, 'error');
+        }
+    })
+    .catch(error => {
+        hideLoading();
+        showAlert('请求失败: ' + error.message, 'error');
+    });
+}
+
+function refreshData() {
     location.reload();
 }
 </script>
